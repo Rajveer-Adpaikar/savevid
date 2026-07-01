@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="SaveVid — free video downloader for YouTube, Instagram &amp; Facebook. No ads, no tracking, no sign-up. Download videos in any quality (144p to 4K) or extract audio as MP3." />
+<meta name="keywords" content="video downloader, YouTube downloader, Instagram downloader, Facebook video downloader, free, online, 4K, MP4, MP3" />
+<meta name="author" content="Envoyc" />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="http://127.0.0.1:5000/" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="SaveVid — Free Video Downloader for YouTube, Instagram &amp; Facebook" />
+<meta property="og:description" content="SaveVid — download any video from YouTube, Instagram &amp; Facebook. Free, no sign-up, no tracking. 144p to 4K." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="http://127.0.0.1:5000/" />
+<meta property="og:site_name" content="SaveVid" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="SaveVid — Free Video Downloader for YouTube, Instagram &amp; Facebook" />
+<meta name="twitter:description" content="Download videos from YouTube, Instagram &amp; Facebook in any quality. No ads, no tracking, no sign-up." />
+
+<!-- Structured Data: WebApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "SaveVid — Free Video Downloader",
+  "url": "http://127.0.0.1:5000/",
+  "description": "Free online video downloader for YouTube, Instagram and Facebook. Download videos in any quality from 144p to 4K, or extract audio as MP3. No sign-up required.",
+  "applicationCategory": "Multimedia",
+  "operatingSystem": "All",
+  "browserRequirements": "Requires JavaScript",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "Envoyc",
+    "url": "https://envoyc.com"
+  }
+}
+</script>
+
+<title>SaveVid — Free Video Downloader for YouTube, Instagram &amp; Facebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', sans-serif; background: #010101; color: #fff; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* Video Background ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â simple autoplay, no scroll shenanigans */
+#video-bg {
+  position: fixed; inset: 0; z-index: -10;
+  background: #0a0a0a;
+}
+#video-bg video {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+#video-bg .overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.6);
+}
+
+/* Particles */
+#particles-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 3;
+}
+
+/* Nav */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 2rem;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+}
+nav .logo {
+  font-weight: 800; font-size: 1.15rem; color: #fff;
+  letter-spacing: -0.025em; text-decoration: none;
+}
+nav .logo span { color: #6c5ce7; }
+nav .nav-links { display: flex; align-items: center; gap: 1rem; }
+nav .nav-links a {
+  font-size: 0.85rem; color: #d1d5db; text-decoration: none;
+  transition: color 0.2s; display: flex; align-items: center; gap: 0.35rem;
+}
+nav .nav-links a:hover { color: #fff; }
+nav .social { display: flex; align-items: center; gap: 0.75rem; }
+nav .social a {
+  color: #d1d5db; transition: color 0.2s; display: flex; align-items: center;
+}
+nav .social a:hover { color: #fff; }
+nav .social svg { width: 1.15rem; height: 1.15rem; }
+
+.site-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: #6c5ce7; color: #fff; font-weight: 600; border-radius: 0.5rem;
+  padding: 0.5rem 1rem; font-size: 0.8rem; text-decoration: none;
+  transition: background 0.2s, transform 0.15s;
+}
+.site-btn:hover { background: #7f6ff0; transform: translateY(-1px); }
+
+/* Main content wrapper ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â scrollable, pushes footer down */
+#content {
+  position: relative; z-index: 10;
+  flex: 1; display: flex; flex-direction: column;
+  padding: 5rem 1.5rem 0;
+  min-height: auto;
+  justify-content: center;
+}
+
+/* Hero / Downloader */
+.hero {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 1rem 0;
+}
+.hero .badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(108,92,231,0.12); border: 1px solid rgba(108,92,231,0.3);
+  border-radius: 999px; padding: 4px 14px; font-size: 0.75rem;
+  color: #a29bfe; margin-bottom: 1.25rem;
+}
+.hero .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #2ecc71; }
+.hero h1 {
+  font-size: clamp(1.75rem, 5vw, 3.5rem); font-weight: 700;
+  line-height: 1.15; max-width: 44rem; margin-bottom: 1rem;
+}
+.hero h1 span { color: #6c5ce7; }
+.hero .subtitle {
+  font-size: 1rem; color: #9ca3af; max-width: 32rem; line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+/* Downloader Card */
+.downloader-card {
+  width: 100%; max-width: 600px;
+  background: rgba(26,26,30,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(46,46,52,0.6);
+  border-radius: 16px;
+  padding: 28px 24px;
+}
+.input-row { display: flex; gap: 10px; }
+.input-row input {
+  flex: 1; padding: 12px 16px;
+  background: rgba(15,15,17,0.8);
+  border: 1px solid #2e2e34; border-radius: 10px;
+  color: #fff; font-size: 15px; outline: none; transition: border-color 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+.input-row input:focus { border-color: #6c5ce7; }
+.input-row input::placeholder { color: #63636b; }
+
+.btn {
+  padding: 12px 24px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; white-space: nowrap; font-family: 'Inter', sans-serif;
+}
+.btn-primary { background: #6c5ce7; color: #fff; }
+.btn-primary:hover { background: #7f6ff0; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.loading-state {
+  display: none; align-items: center; gap: 12px;
+  padding: 16px 0 0; color: #8e8e96; font-size: 14px;
+}
+.loading-state.visible { display: flex; }
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid #2e2e34;
+  border-top-color: #6c5ce7;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-box {
+  display: none;
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 10px;
+  padding: 12px 16px; font-size: 14px;
+  color: #e74c3c; margin-top: 12px;
+}
+.error-box.visible { display: block; }
+
+ /* Results */
+#results { display: none; width: 100%; max-width: 720px; margin-top: 20px; }
+#results.visible { display: block; }
+
+.video-info {
+  background: rgba(26,26,30,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(46,46,52,0.6);
+  border-radius: 12px;
+  padding: 20px 24px; margin-bottom: 16px; text-align: left;
+}
+.video-info h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.video-meta {
+  display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px;
+  font-size: 13px; color: #8e8e96;
+}
+.video-meta span { display: flex; align-items: center; gap: 4px; }
+.video-meta .tag { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.video-meta .tag.youtube { background: rgba(255,0,0,.12); color: #ff4444; }
+.video-meta .tag.instagram { background: rgba(225,48,108,.12); color: #e1306c; }
+.video-meta .tag.facebook { background: rgba(24,119,242,.12); color: #1877f2; }
+
+.formats-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #8e8e96; }
+.category-buttons { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.btn-category {
+  flex: 1; min-width: 120px; padding: 12px 16px;
+  border: 2px solid #2e2e34; border-radius: 10px;
+  background: rgba(26,26,30,0.7);
+  color: #8e8e96; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s; text-align: center;
+  font-family: 'Inter', sans-serif;
+}
+.btn-category:hover { border-color: #6c5ce7; color: #fff; background: rgba(26,26,30,0.9); }
+.btn-category.active { border-color: #6c5ce7; background: rgba(108,92,231,0.15); color: #fff; }
+.btn-category .count {
+  display: inline-block;
+  background: rgba(46,46,52,0.5); color: #63636b;
+  font-size: 11px; padding: 1px 8px; border-radius: 999px; margin-left: 6px;
+}
+.btn-category.active .count { background: rgba(108,92,231,0.25); color: #6c5ce7; }
+
+.format-card {
+  background: rgba(26,26,30,0.7);
+  border: 1px solid #2e2e34; border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 8px;
+  cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: 14px;
+}
+.format-card:hover { border-color: #6c5ce7; background: rgba(26,26,30,0.9); }
+.format-card.selected { border-color: #6c5ce7; background: rgba(108,92,231,0.15); }
+
+.format-card input[type="radio"] {
+  appearance: none; width: 18px; height: 18px;
+  border: 2px solid #63636b; border-radius: 50%; flex-shrink: 0;
+  position: relative; transition: all .15s;
+}
+.format-card input[type="radio"]:checked { border-color: #6c5ce7; background: #6c5ce7; }
+.format-card input[type="radio"]:checked::after {
+  content: ''; position: absolute; inset: 4px; background: #fff; border-radius: 50%;
+}
+.format-details { flex: 1; min-width: 0; text-align: left; }
+.format-details .format-name { font-size: 14px; font-weight: 500; }
+.format-details .format-meta {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-top: 4px; font-size: 12px; color: #8e8e96;
+}
+.format-details .format-meta span { display: flex; align-items: center; gap: 3px; }
+.format-size { font-weight: 600; color: #2ecc71; font-size: 13px; text-align: right; flex-shrink: 0; }
+.format-size.unknown { color: #63636b; }
+
+.download-section { display: none; margin-top: 16px; }
+.download-section.visible { display: block; }
+.download-section .btn { width: 100%; padding: 14px; font-size: 15px; }
+
+.progress-section { display: none; margin-top: 16px; }
+.progress-section.visible { display: block; }
+.progress-bar-container {
+  background: rgba(46,46,52,0.5); border-radius: 999px; height: 6px; overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+  border-radius: 999px; width: 0%; transition: width .3s;
+}
+.progress-text { text-align: center; font-size: 13px; color: #8e8e96; margin-top: 8px; }
+
+.success-card {
+  display: none;
+  background: rgba(46,204,113,0.12);
+  border: 1px solid rgba(46,204,113,0.3);
+  border-radius: 12px; padding: 20px 24px; margin-top: 16px; text-align: left;
+}
+.success-card.visible { display: block; }
+.success-card h3 { color: #2ecc71; font-size: 16px; margin-bottom: 6px; }
+.success-card p { font-size: 13px; color: #8e8e96; }
+.success-card .file-path {
+  margin-top: 8px; background: rgba(15,15,17,0.5);
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 12px; color: #63636b; font-family: monospace; word-break: break-all;
+}
+
+.no-formats-msg {
+  color: #63636b; padding: 20px; font-size: 14px;
+  text-align: center; border-radius: 10px; border: 1px dashed #2e2e34;
+}
+
+/* Footer */
+#section-footer {
+  position: relative; z-index: 10;
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; padding: 3rem 2rem 2rem;
+}
+#section-footer h2 { font-size: clamp(1.25rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.75rem; }
+#section-footer h2 span { color: #6c5ce7; }
+#section-footer p {
+  color: #9ca3af; font-size: 0.9rem; max-width: 28rem; line-height: 1.6; margin-bottom: 1.5rem;
+}
+.footer-links { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+.footer-links a {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  color: #d1d5db; text-decoration: none; font-size: 0.85rem;
+  padding: 0.6rem 1.2rem; border: 1px solid #2e2e34; border-radius: 10px;
+  transition: all 0.2s;
+}
+.footer-links a:hover { border-color: #6c5ce7; color: #fff; background: rgba(108,92,231,0.08); }
+.footer-links svg { width: 1.1rem; height: 1.1rem; }
+.copyright { margin-top: 2rem; font-size: 0.8rem; color: #63636b; }
+.copyright a { color: #8e8e96; text-decoration: none; }
+
+@media (max-width: 640px) {
+  nav { padding: 0.75rem 1rem; }
+  nav .nav-links { display: none; }
+  nav .social { gap: 0.5rem; }
+  #content { padding: 4rem 1rem 2rem; }
+  .downloader-card { padding: 20px 16px; }
+  .input-row { flex-direction: column; }
+  .video-info { padding: 16px; }
+  .format-card { padding: 12px; }
+  .hero .subtitle { font-size: 0.9rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Video Background ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â simple autoplay loop, no scroll frame extraction -->
+<div id="video-bg">
+  <video autoplay loop muted playsinline preload="auto" crossorigin="anonymous" aria-label="Background animation from Envoyc creative portfolio"
+    poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080'%3E%3Crect fill='%230a0a0a' width='1920' height='1080'/%3E%3C/svg%3E"
+    src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260616_212935_bbf608da-62d1-4f25-9be4-c346e4d09cc8.mp4"
+  ></video>
+  <div class="overlay"></div>
+</div>
+
+<!-- Particles -->
+<canvas id="particles-canvas"></canvas>
+
+<!-- Navigation -->
+<nav>
+  <div style="flex:1;display:flex;align-items:center;gap:2rem;">
+    <a href="#" class="logo">Save<span>Vid</span></a>
+  </div>
+  <div class="nav-links">
+    <a href="https://envoyc.com" target="_blank" class="site-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+      Work with Envoyc
+    </a>
+  </div>
+  <div style="flex:1;display:flex;justify-content:flex-end;">
+    <div class="social">
+    <a href="https://github.com/Rajveer-Adpaikar" target="_blank" title="GitHub">
+      <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    </a>
+    <a href="https://www.youtube.com/@Rajveer-Adpaikar-8/shorts" target="_blank" title="YouTube">
+      <svg fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+    </a>
+    <a href="https://www.instagram.com/rajadpaikar_" target="_blank" title="Instagram">
+      <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+    </a>
+  </div>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<main id="content">
+  <div class="hero">
+    <div class="badge">
+      <span class="dot"></span>
+      Free &amp; Open Source
+    </div>
+    <h1>Save<span>Vid</span></h1>
+    <p class="subtitle">
+      Download any video from YouTube, Instagram &amp; Facebook.
+      SaveVid is free, no sign-up, no tracking.
+    </p>
+    <p style="font-size:0.8rem;color:#d1d5db;margin-bottom:1.5rem;letter-spacing:0.04em;">
+      Powered by <a href="https://envoyc.com" target="_blank" style="color:#a29bfe;text-decoration:none;font-weight:500;">Envoyc</a>
+    </p>
+
+    <!-- Downloader Card -->
+    <div class="downloader-card">
+      <div class="input-row">
+        <input
+          type="url"
+          id="url-input"
+          placeholder="Paste YouTube, Instagram or Facebook link here..."
+          autocomplete="off"
+        />
+        <button class="btn btn-primary" id="fetch-btn" onclick="fetchFormats()">
+          Download
+        </button>
+      </div>
+      <div class="loading-state" id="loading">
+        <div class="spinner"></div>
+        <span>Fetching available formats...</span>
+      </div>
+      <div class="error-box" id="error"></div>
+
+      <!-- Results -->
+      <div id="results">
+        <div class="video-info" id="video-info">
+          <h2 id="video-title"></h2>
+          <div class="video-meta" id="video-meta"></div>
+        </div>
+
+        <div class="formats-section" id="formats-section">
+          <h3>Choose format</h3>
+          <div class="category-buttons" id="category-buttons"></div>
+          <div id="formats-container"></div>
+          <div class="download-section" id="download-section">
+            <button class="btn btn-primary" id="download-btn" onclick="startDownload()">
+              &#11015; Download Selected Format
+            </button>
+          </div>
+        </div>
+
+        <div class="progress-section" id="progress-section">
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div class="progress-text" id="progress-text">Downloading...</div>
+        </div>
+
+        <div class="success-card" id="success-card">
+          <h3>&#10003; Download complete!</h3>
+          <p>Your file has been saved to:</p>
+          <div class="file-path" id="file-path"></div>
+          <p style="margin-top:8px;color:#8e8e96;font-size:13px;" id="file-size-info"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer id="section-footer">
+    <h2>Let's <span>work together</span></h2>
+    <p>I build web apps, automation tools, and AI-powered solutions. Reach out and let's create something great.</p>
+    <div class="footer-links">
+      <a href="https://envoyc.com" target="_blank">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        envoyc.com
+      </a>
+      <a href="https://github.com/Rajveer-Adpaikar" target="_blank">
+        <svg fill="currentColor" viewBox="0 0 24 24" width="16" height="16"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <a href="https://www.youtube.com/@Rajveer-Adpaikar-8/shorts" target="_blank">
+        <svg fill="currentColor" viewBox="0 0 24 24" width="16" height="16"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        YouTube
+      </a>
+      <a href="https://www.instagram.com/rajadpaikar_" target="_blank">
+        <svg fill="currentColor" viewBox="0 0 24 24" width="16" height="16"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+        Instagram
+      </a>
+    </div>
+    <div class="copyright">
+      Built by <a href="https://envoyc.com" target="_blank">Envoyc</a> &bull; Files save to ~/Downloads/SaveVid/
+    </div>
+  </footer>
+</div>
+
+<script>
+(function() {
+  // ===================== VIDEO BACKGROUND =====================
+  // Just a simple autoplay loop ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â no scroll-driven frame extraction.
+  // The HTML5 video tag handles it natively, zero lag.
+
+  // ===================== PARTICLES (lightweight) =====================
+  const pCanvas = document.getElementById('particles-canvas');
+  const pCtx = pCanvas.getContext('2d');
+  let particles = [];
+  let animId = null;
+
+  function resizeParticles() {
+    pCanvas.width = window.innerWidth;
+    pCanvas.height = window.innerHeight;
+    createParticles();
+  }
+
+  function createParticles() {
+    const count = Math.min(Math.floor((pCanvas.width * pCanvas.height) / 16000), 100);
+    particles = Array.from({ length: count }, () => ({
+      x: Math.random() * pCanvas.width,
+      y: Math.random() * pCanvas.height,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.2,
+      size: Math.random() * 1.2 + 0.5,
+      opacity: Math.random() * 0.4 + 0.1,
+    }));
+  }
+
+  function animateParticles() {
+    pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = pCanvas.width;
+      if (p.x > pCanvas.width) p.x = 0;
+      if (p.y < 0) p.y = pCanvas.height;
+      if (p.y > pCanvas.height) p.y = 0;
+      pCtx.beginPath();
+      pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      pCtx.fillStyle = `rgba(255,255,255,${p.opacity})`;
+      pCtx.fill();
+    }
+    animId = requestAnimationFrame(animateParticles);
+  }
+
+  resizeParticles();
+  window.addEventListener('resize', resizeParticles);
+  animateParticles();
+})();
+
+// ===================== DOWNLOADER LOGIC =====================
+const API_BASE = '';
+
+let currentData = null;
+let selectedFormatId = null;
+let currentCategory = null;
+let formatsByCategory = {};
+
+const urlInput = document.getElementById('url-input');
+const fetchBtn = document.getElementById('fetch-btn');
+const loading = document.getElementById('loading');
+const errorBox = document.getElementById('error');
+const results = document.getElementById('results');
+const videoTitle = document.getElementById('video-title');
+const videoMeta = document.getElementById('video-meta');
+const formatsSection = document.getElementById('formats-section');
+const formatsContainer = document.getElementById('formats-container');
+const downloadSection = document.getElementById('download-section');
+const downloadBtn = document.getElementById('download-btn');
+const progressSection = document.getElementById('progress-section');
+const progressBar = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const successCard = document.getElementById('success-card');
+const filePath = document.getElementById('file-path');
+const fileSizeInfo = document.getElementById('file-size-info');
+const videoInfo = document.getElementById('video-info');
+
+urlInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') fetchFormats();
+});
+
+async function fetchFormats() {
+  const url = urlInput.value.trim();
+  if (!url) { showError('Please enter a video URL.'); return; }
+
+  hideAll();
+  showLoading(true);
+  hideError();
+
+  try {
+    const res = await fetch(API_BASE + '/api/formats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showError(data.error || 'Failed to fetch formats.');
+      showLoading(false);
+      return;
+    }
+
+    currentData = data;
+    selectedFormatId = null;
+    showLoading(false);
+    renderVideoInfo(data);
+    renderFormats(data);
+    results.classList.add('visible');
+
+  } catch (err) {
+    showError('Network error. Is the server running?');
+    showLoading(false);
+  }
+}
+
+function renderVideoInfo(data) {
+  videoTitle.textContent = data.title;
+  videoMeta.innerHTML = '';
+
+  if (data.duration_formatted) {
+    const span = document.createElement('span');
+    span.textContent = 'Duration: ' + data.duration_formatted;
+    videoMeta.appendChild(span);
+  }
+
+  const sourceSpan = document.createElement('span');
+  const tag = document.createElement('span');
+  tag.className = 'tag ' + data.source;
+  tag.textContent = data.source === 'youtube' ? 'YouTube' : data.source === 'facebook' ? 'Facebook' : 'Instagram';
+  sourceSpan.appendChild(tag);
+  videoMeta.appendChild(sourceSpan);
+
+  if (data.max_resolution) {
+    const span = document.createElement('span');
+    span.textContent = 'Max Resolution: ' + data.max_resolution;
+    videoMeta.appendChild(span);
+  }
+
+  const fmtCount = document.createElement('span');
+  fmtCount.textContent = 'Number of formats: ' + data.format_count;
+  videoMeta.appendChild(fmtCount);
+
+  videoInfo.classList.add('visible');
+}
+
+function renderFormats(data) {
+  formatsContainer.innerHTML = '';
+  downloadSection.classList.remove('visible');
+  currentCategory = null;
+
+  formatsByCategory = { audio: [], mp4: [], video_only: [] };
+
+  data.formats.forEach(f => {
+    if (f.type === 'audio_only') {
+      formatsByCategory.audio.push(f);
+    } else if (f.type === 'combined') {
+      formatsByCategory.mp4.push(f);
+    } else if (f.type === 'video_only') {
+      formatsByCategory.video_only.push(f);
+    }
+  });
+
+  const btnContainer = document.getElementById('category-buttons');
+  btnContainer.innerHTML = '';
+
+  const categories = [
+    { key: 'audio', label: 'Audio (MP3)' },
+    { key: 'mp4', label: 'Video (MP4)' },
+    { key: 'video_only', label: 'Video without Audio' },
+  ];
+
+  categories.forEach(cat => {
+    const fmts = formatsByCategory[cat.key] || [];
+    if (fmts.length === 0) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-category';
+    btn.innerHTML = cat.label + ' <span class="count">' + fmts.length + '</span>';
+    btn.onclick = () => showCategory(cat.key);
+    btnContainer.appendChild(btn);
+  });
+
+  const firstCat = categories.find(c => (formatsByCategory[c.key] || []).length > 0);
+  if (firstCat) {
+    showCategory(firstCat.key);
+  } else {
+    formatsContainer.innerHTML = '<div class="no-formats-msg">No downloadable formats found for this video.</div>';
+  }
+}
+
+function showCategory(category) {
+  currentCategory = category;
+
+  document.querySelectorAll('.btn-category').forEach(btn => btn.classList.remove('active'));
+  const btns = document.getElementById('category-buttons');
+  const catKeys = ['audio', 'mp4', 'video_only'];
+  btns.querySelectorAll('.btn-category').forEach((btn) => {
+    const idx = Array.from(btns.children).indexOf(btn);
+    if (catKeys[idx] === category) btn.classList.add('active');
+  });
+
+  formatsContainer.innerHTML = '';
+  const fmts = formatsByCategory[category] || [];
+
+  if (fmts.length === 0) {
+    formatsContainer.innerHTML = '<div class="no-formats-msg">No formats available in this category.</div>';
+    downloadSection.classList.remove('visible');
+    return;
+  }
+
+  fmts.forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'format-card';
+    card.dataset.formatId = f.format_id;
+    card.onclick = () => selectFormat(f.format_id);
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'format';
+    radio.value = f.format_id;
+
+    const details = document.createElement('div');
+    details.className = 'format-details';
+
+    const name = document.createElement('div');
+    name.className = 'format-name';
+    name.textContent = f.display_name;
+
+    const meta = document.createElement('div');
+    meta.className = 'format-meta';
+
+    if (f.height) {
+      const r = document.createElement('span');
+      r.textContent = f.height + 'p';
+      meta.appendChild(r);
+    }
+
+    if (f.vcodec && f.vcodec !== 'none') {
+      const c = document.createElement('span');
+      c.textContent = f.vcodec.replace('avc1', 'H.264').replace('vp9', 'VP9');
+      meta.appendChild(c);
+    }
+
+    const extSpan = document.createElement('span');
+    extSpan.textContent = f.ext.toUpperCase();
+    meta.appendChild(extSpan);
+
+    if (f.bitrate) {
+      const b = document.createElement('span');
+      b.textContent = f.bitrate + 'kbps';
+      meta.appendChild(b);
+    }
+
+    if (f.note) {
+      const noteDiv = document.createElement('div');
+      noteDiv.style.cssText = 'font-size:11px;color:#63636b;margin-top:2px;width:100%;';
+      noteDiv.textContent = f.note;
+      meta.appendChild(noteDiv);
+    }
+
+    details.appendChild(name);
+    details.appendChild(meta);
+
+    const sizeSpan = document.createElement('div');
+    const isUnknown = f.filesize === 'Unknown';
+    sizeSpan.className = 'format-size' + (isUnknown ? ' unknown' : '');
+    sizeSpan.textContent = isUnknown ? 'Size unknown' : f.filesize;
+
+    card.appendChild(radio);
+    card.appendChild(details);
+    card.appendChild(sizeSpan);
+    formatsContainer.appendChild(card);
+  });
+
+  if (selectedFormatId) {
+    document.querySelectorAll('.format-card').forEach(c => {
+      const match = c.dataset.formatId === selectedFormatId;
+      c.classList.toggle('selected', match);
+      const radio = c.querySelector('input[type="radio"]');
+      if (radio) radio.checked = match;
+    });
+  }
+}
+
+function selectFormat(formatId) {
+  selectedFormatId = formatId;
+
+  document.querySelectorAll('.format-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.formatId === formatId);
+    const radio = c.querySelector('input[type="radio"]');
+    if (radio) radio.checked = c.dataset.formatId === formatId;
+  });
+
+  downloadSection.classList.add('visible');
+}
+
+async function startDownload() {
+  if (!selectedFormatId || !currentData) return;
+
+  downloadSection.classList.remove('visible');
+  formatsSection.classList.remove('visible');
+  videoInfo.classList.remove('visible');
+  progressSection.classList.add('visible');
+  hideError();
+
+  progressBar.style.width = '10%';
+  progressText.textContent = 'Starting download...';
+
+  try {
+    const res = await fetch(API_BASE + '/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: currentData.url,
+        format_id: selectedFormatId,
+      }),
+    });
+
+    const data = await res.json();
+
+    progressBar.style.width = '100%';
+    progressText.textContent = 'Processing...';
+
+    if (!res.ok || data.error) {
+      await sleep(400);
+      showDownloadError(data.error || 'Download failed.');
+      return;
+    }
+
+    await sleep(500);
+    showSuccess(data);
+
+  } catch (err) {
+    showDownloadError('Network error during download.');
+  }
+}
+
+function showSuccess(data) {
+  progressSection.classList.remove('visible');
+
+  if (data.file_path) {
+    filePath.textContent = data.file_path;
+  } else if (data.output_dir) {
+    filePath.textContent = data.output_dir + '/ (check your downloads folder)';
+  }
+
+  if (data.file_size_mb) {
+    fileSizeInfo.innerHTML = 'File size: <span style="color:#2ecc71;font-weight:500;">' + data.file_size_mb + ' MB</span>';
+  }
+
+  successCard.classList.add('visible');
+
+  const oldAgain = successCard.querySelector('.again-btn');
+  if (oldAgain) oldAgain.remove();
+  const again = document.createElement('button');
+  again.className = 'btn btn-primary again-btn';
+  again.textContent = 'Download another video';
+  again.style.marginTop = '16px';
+  again.onclick = () => resetUI();
+  successCard.appendChild(again);
+}
+
+function resetUI() {
+  hideAll();
+  hideError();
+  currentData = null;
+  selectedFormatId = null;
+  currentCategory = null;
+  formatsByCategory = {};
+  urlInput.value = '';
+  urlInput.focus();
+}
+
+function showLoading(v) {
+  loading.classList.toggle('visible', v);
+  fetchBtn.disabled = v;
+}
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('visible');
+}
+
+function hideError() {
+  errorBox.classList.remove('visible');
+}
+
+function showDownloadError(msg) {
+  progressSection.classList.remove('visible');
+  showError(msg);
+  if (currentData) {
+    videoInfo.classList.add('visible');
+    formatsSection.classList.add('visible');
+    downloadSection.classList.add('visible');
+  }
+}
+
+function hideAll() {
+  videoInfo.classList.remove('visible');
+  formatsSection.classList.remove('visible');
+  downloadSection.classList.remove('visible');
+  progressSection.classList.remove('visible');
+  successCard.classList.remove('visible');
+  successCard.querySelectorAll('button').forEach(b => b.remove());
+  document.getElementById('category-buttons').innerHTML = '';
+  formatsContainer.innerHTML = '';
+  results.classList.remove('visible');
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+</script>
+</body>
+</html>
