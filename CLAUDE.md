@@ -109,6 +109,16 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - **Preferred deployment**: subdirectory of envoyc.com → `https://envoyc.com/savevid`
   - Subdirectory inherits domain authority from envoyc.com (vs standalone subdomain at zero SEO trust)
 - Netlify subdomain fallback available but not preferred
+- Live URL: https://savevidfree.netlify.app/
+
+### Netlify Function Limitations
+- **Format listing works**: `/api/formats` runs `yt-dlp -J` (fast JSON response, well within 10s timeout)
+- **Downloads are limited**: Netlify Functions have a 10-second timeout and 10MB response limit on the free tier
+  - Small YouTube clips (<5MB) may download successfully
+  - Larger files or 4K videos will time out or exceed the response limit
+  - Instagram requires browser cookies (not available in Lambda)
+- **To download large files**: Use the local Flask app instead (`python app.py` or start.bat)
+- Netlify deployment is ideal for **demo/showcase purposes** and listing formats
 
 ### yt-dlp Requirement
 - Instagram requires yt-dlp **master build with curl_cffi** (browser impersonation).
