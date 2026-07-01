@@ -13,10 +13,7 @@ import tempfile
 import traceback
 from urllib.parse import parse_qs
 
-# Add tools directory to the Python path
-_TOOLS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "tools")
-sys.path.insert(0, _TOOLS_DIR)
-
+# Import tools (copied into the same directory for Netlify bundling)
 from list_formats import list_formats
 from download_video import download_video
 
