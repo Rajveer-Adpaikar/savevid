@@ -22,3 +22,8 @@ Thumbs.db
 # Flask
 instance/
 *.db
+
+cookies_base64.txt
+cookies.txt
+paste_into_render.txt
+www.*.com_cookies.txt
