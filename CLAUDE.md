@@ -257,7 +257,7 @@ Both tools use `_find_yt_dlp()` to locate the binary in this order:
 - Downloads single format via yt-dlp to `~/Downloads/SaveVid/`.
 - **YouTube + Instagram + Facebook**: auto-appends `+bestaudio/best` for DASH audio merge (skipped for audio-only formats).
 - Uses `--windows-filenames`, `--restrict-filenames`, and `--trim-filenames 100` to produce safe, ASCII-only filenames without emojis or special characters.
-- Progress output via stdout for UI feedback.
+- Accepts optional `progress_callback` — called with `{"percent": 45.2, "speed": "...", "eta": "..."}` on each yt-dlp progress line.
 - Handles: HTTP 403/404, unavailable formats, impersonation errors, media not found.
 
 ## Project Structure
@@ -300,4 +300,5 @@ Files save to ~/Downloads/SaveVid/
 - **Instagram works online with cookies**: Same static binary — uses `instagram:app_id=ios` (only valid extractor arg) + `--cookies` for the `sessionid` cookie. Note: `instagram:webpage=api` **does not exist** in yt-dlp and was silently ignored.
 - **Cookies expire every 2-4 weeks**: YouTube and Instagram cookies are short-lived. When downloads stop working, re-export cookies.txt from your browser, base64-encode it, and update the `COOKIES` env var in Render dashboard. Then trigger a new deploy.
 - **Facebook works without cookies**: Facebook downloads work on Render even without authentication, as long as the video is public and the Facebook extractor isn't broken upstream (issue #15161).
+- **Download progress streaming**: `app.py` streams real-time download progress as NDJSON (newline-delimited JSON) from `/api/download` using a background thread + queue. The frontend reads the stream via `response.body.getReader()` and animates the progress bar with percentage, speed, and ETA.
 - **File streaming via download tokens**: `app.py` generates one-time `/api/dl/<token>` URLs that stream the file to the browser and clean up the temp directory afterward. Works for all successfully downloaded files.

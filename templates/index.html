@@ -785,7 +785,7 @@ async function startDownload() {
   progressSection.classList.add('visible');
   hideError();
 
-  progressBar.style.width = '10%';
+  progressBar.style.width = '0%';
   progressText.textContent = 'Starting download...';
 
   try {
@@ -799,19 +799,48 @@ async function startDownload() {
       }),
     });
 
-    const data = await res.json();
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let lineNum = 0;
 
-    progressBar.style.width = '100%';
-    progressText.textContent = 'Processing...';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    if (!res.ok || data.error) {
-      await sleep(400);
-      showDownloadError(data.error || 'Download failed.');
-      return;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const event = JSON.parse(trimmed);
+
+          if (event.type === 'progress') {
+            const pct = Math.round(event.percent);
+            progressBar.style.width = Math.min(pct, 99) + '%';
+            if (event.speed && event.eta) {
+              progressText.textContent = pct + '% - ' + event.speed + ' - ETA ' + event.eta;
+            } else {
+              progressText.textContent = 'Downloading... ' + pct + '%';
+            }
+          } else if (event.type === 'complete') {
+            progressBar.style.width = '100%';
+            progressText.textContent = 'Processing...';
+            await sleep(600);
+            showSuccess(event);
+          } else if (event.type === 'error') {
+            await sleep(400);
+            showDownloadError(event.message || 'Download failed.');
+          }
+        } catch (e) {
+          // skip unparseable lines
+        }
+      }
     }
-
-    await sleep(500);
-    showSuccess(data);
 
   } catch (err) {
     showDownloadError('Network error during download.');

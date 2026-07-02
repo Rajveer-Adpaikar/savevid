@@ -14,9 +14,11 @@ import shutil
 import atexit
 import tempfile
 import threading
+import queue
+import re
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, session, Response
 from flask_cors import CORS
 
 # Add tools directory to path
@@ -113,8 +115,12 @@ def get_formats():
 @app.route("/api/download", methods=["POST"])
 def download():
     """
-    Download a specific format and return a JSON with a one-time
-    download URL so the browser can retrieve the actual file.
+    Download a specific format and stream progress back as NDJSON.
+    Each line is a JSON object with a 'type' field:
+      - {"type": "progress", "percent": 45.2, "speed": "...", "eta": "..."}
+      - {"type": "complete", "file_path": "...", ...}
+      - {"type": "error", "message": "..."}
+    The last event is always 'complete' or 'error'.
     """
     data = request.get_json()
     url = data.get("url", "").strip()
@@ -124,27 +130,56 @@ def download():
     if not url or not format_id:
         return jsonify({"error": "Missing URL or format selection."}), 400
 
-    # Download to a temporary directory unique per request
-    tmp_dir = tempfile.mkdtemp(prefix="savevid_")
-    result = download_video(url, format_id, tmp_dir, format_type=format_type)
+    def generate():
+        tmp_dir = tempfile.mkdtemp(prefix="savevid_")
+        q = queue.Queue()
 
-    if "error" in result:
-        # Clean up the temp dir on failure
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-        return jsonify({"error": result["error"]}), 400
+        def on_progress(info):
+            q.put(("progress", info))
 
-    file_path = result.get("file_path")
-    if file_path and os.path.exists(file_path):
-        # Create a one-time download token
-        token = str(uuid.uuid4())
-        _download_cache[token] = (file_path, time.time() + _DOWNLOAD_CACHE_TTL)
-        result["download_url"] = f"/api/dl/{token}"
-        result["file_path"] = file_path  # keep for local mode display
-    else:
-        # No file found — clean up
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        def run():
+            try:
+                result = download_video(url, format_id, tmp_dir, format_type=format_type, progress_callback=on_progress)
+                q.put(("result", result))
+            except Exception as e:
+                q.put(("error", str(e)))
 
-    return jsonify(result)
+        thread = threading.Thread(target=run, daemon=True)
+        thread.start()
+
+        while True:
+            item = q.get()
+            kind = item[0]
+
+            if kind == "progress":
+                info = item[1]
+                yield json.dumps({"type": "progress", **info}) + "\n"
+
+            elif kind == "result":
+                result = item[1]
+                if "error" in result:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    yield json.dumps({"type": "error", "message": result["error"]}) + "\n"
+                else:
+                    file_path = result.get("file_path")
+                    if file_path and os.path.exists(file_path):
+                        token = str(uuid.uuid4())
+                        _download_cache[token] = (file_path, time.time() + _DOWNLOAD_CACHE_TTL)
+                        result["download_url"] = f"/api/dl/{token}"
+                        result["file_path"] = file_path
+                    else:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                    yield json.dumps({"type": "complete", **result}) + "\n"
+                break
+
+            elif kind == "error":
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                yield json.dumps({"type": "error", "message": item[1]}) + "\n"
+                break
+
+        thread.join()
+
+    return Response(generate(), mimetype="application/x-ndjson")
 
 
 @app.route("/api/dl/<token>")

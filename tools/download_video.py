@@ -14,6 +14,7 @@ import sys
 import subprocess
 import os
 import shutil
+import re
 
 
 def get_downloads_folder():
@@ -117,7 +118,7 @@ INSTAGRAM_COOKIE_MSG = (
 )
 
 
-def download_video(url, format_id, output_dir=None, use_cookies=None, format_type=None):
+def download_video(url, format_id, output_dir=None, use_cookies=None, format_type=None, progress_callback=None):
     """
     Download the specified format from the given URL.
 
@@ -207,8 +208,19 @@ def download_video(url, format_id, output_dir=None, use_cookies=None, format_typ
         for line in process.stdout:
             line = line.strip()
             stdout_lines.append(line)
-            # Also print to stderr so the caller can see progress
             print(line, file=sys.stderr, flush=True)
+
+            if progress_callback:
+                m = re.search(r"\[download\]\s+([\d.]+)%", line)
+                if m:
+                    info = {"percent": float(m.group(1))}
+                    speed_m = re.search(r"at\s+([\d.]+[KMGTP]?i?B/s)", line)
+                    eta_m = re.search(r"ETA\s+([\d:]+)", line)
+                    if speed_m:
+                        info["speed"] = speed_m.group(1)
+                    if eta_m:
+                        info["eta"] = eta_m.group(1)
+                    progress_callback(info)
 
         for line in process.stderr:
             stderr_lines.append(line)
