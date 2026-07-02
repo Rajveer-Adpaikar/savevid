@@ -9,7 +9,10 @@ import json
 import os
 import sys
 import time
+import uuid
 import shutil
+import atexit
+import tempfile
 import threading
 from pathlib import Path
 
@@ -34,12 +37,34 @@ DOWNLOAD_DIR = os.path.join(get_downloads_folder(), "SaveVid")
 _format_cache = {}       # url -> (expiry_epoch, result_dict)
 _FORMAT_CACHE_TTL = 600  # seconds (10 minutes)
 
+# ─── Download token cache ────────────────────────────────────────
+# Stores downloaded file paths keyed by a unique token so the user's
+# browser can pull the file as a download.  Tokens expire after 5 min.
+_download_cache = {}       # token -> (file_path, expiry_epoch)
+_DOWNLOAD_CACHE_TTL = 300  # seconds
+
+
+def _cleanup_temp_dirs():
+    """Remove any leftover temp download dirs on shutdown."""
+    for token, (fpath, _) in list(_download_cache.items()):
+        d = os.path.dirname(fpath)
+        if d and os.path.isdir(d):
+            try:
+                shutil.rmtree(d, ignore_errors=True)
+            except Exception:
+                pass
+
+
+atexit.register(_cleanup_temp_dirs)
+
+
 def _get_cached_formats(url):
     """Return cached result for *url* if still fresh, else None."""
     entry = _format_cache.get(url)
     if entry and time.time() < entry[0]:
         return entry[1]
     return None
+
 
 def _set_cached_formats(url, result):
     """Store *result* for *url* with the configured TTL."""
@@ -87,7 +112,10 @@ def get_formats():
 
 @app.route("/api/download", methods=["POST"])
 def download():
-    """Download a specific format and stream it to the user."""
+    """
+    Download a specific format and return a JSON with a one-time
+    download URL so the browser can retrieve the actual file.
+    """
     data = request.get_json()
     url = data.get("url", "").strip()
     format_id = data.get("format_id", "").strip()
@@ -95,13 +123,80 @@ def download():
     if not url or not format_id:
         return jsonify({"error": "Missing URL or format selection."}), 400
 
-    # Run download in a thread so we can track progress
-    result = download_video(url, format_id, DOWNLOAD_DIR)
+    # Download to a temporary directory unique per request
+    tmp_dir = tempfile.mkdtemp(prefix="savevid_")
+    result = download_video(url, format_id, tmp_dir)
 
     if "error" in result:
+        # Clean up the temp dir on failure
+        shutil.rmtree(tmp_dir, ignore_errors=True)
         return jsonify({"error": result["error"]}), 400
 
+    file_path = result.get("file_path")
+    if file_path and os.path.exists(file_path):
+        # Create a one-time download token
+        token = str(uuid.uuid4())
+        _download_cache[token] = (file_path, time.time() + _DOWNLOAD_CACHE_TTL)
+        result["download_url"] = f"/api/dl/{token}"
+        result["file_path"] = file_path  # keep for local mode display
+    else:
+        # No file found — clean up
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
     return jsonify(result)
+
+
+@app.route("/api/dl/<token>")
+def serve_download(token):
+    """
+    Serve a previously-downloaded file to the browser and clean up
+    the temporary directory afterward.
+    """
+    entry = _download_cache.pop(token, None)
+    if not entry:
+        return jsonify({"error": "Download link expired or invalid."}), 404
+
+    file_path, expiry = entry
+    if time.time() > expiry or not os.path.exists(file_path):
+        _cleanup_one(file_path)
+        return jsonify({"error": "Download link expired."}), 410
+
+    filename = os.path.basename(file_path)
+    tmp_dir = os.path.dirname(file_path)
+
+    # Stream the file to the browser, then clean up
+    response = send_file(
+        file_path,
+        as_attachment=True,
+        download_name=filename,
+    )
+
+    # Schedule cleanup after sending
+    @response.call_on_close
+    def _do_cleanup():
+        try:
+            if os.path.isdir(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    return response
+
+
+def _cleanup_one(file_path):
+    """Remove the parent temp dir of *file_path* if it still exists."""
+    d = os.path.dirname(file_path)
+    if d and os.path.isdir(d):
+        try:
+            shutil.rmtree(d, ignore_errors=True)
+        except Exception:
+            pass
+
+
+@app.route("/api/health")
+def health():
+    """Health check endpoint (useful for monitoring)."""
+    return jsonify({"status": "ok"})
 
 
 if __name__ == "__main__":

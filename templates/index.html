@@ -817,14 +817,34 @@ async function startDownload() {
 function showSuccess(data) {
   progressSection.classList.remove('visible');
 
-  if (data.file_path) {
+  if (data.download_url) {
+    // Online mode — trigger browser download automatically
+    filePath.textContent = 'Download starting...';
+
+    // Create a hidden link and click it to start the download
+    const a = document.createElement('a');
+    a.href = data.download_url;
+    a.download = data.file_name || '';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Show file info
+    if (data.file_size_mb) {
+      fileSizeInfo.innerHTML = 'File size: <span style="color:#2ecc71;font-weight:500;">' + data.file_size_mb + ' MB</span>';
+    }
+  } else if (data.file_path) {
+    // Local mode — file saved to disk, just show the path
     filePath.textContent = data.file_path;
+    if (data.file_size_mb) {
+      fileSizeInfo.innerHTML = 'File size: <span style="color:#2ecc71;font-weight:500;">' + data.file_size_mb + ' MB</span>';
+    }
   } else if (data.output_dir) {
     filePath.textContent = data.output_dir + '/ (check your downloads folder)';
-  }
-
-  if (data.file_size_mb) {
-    fileSizeInfo.innerHTML = 'File size: <span style="color:#2ecc71;font-weight:500;">' + data.file_size_mb + ' MB</span>';
+    if (data.file_size_mb) {
+      fileSizeInfo.innerHTML = 'File size: <span style="color:#2ecc71;font-weight:500;">' + data.file_size_mb + ' MB</span>';
+    }
   }
 
   successCard.classList.add('visible');
