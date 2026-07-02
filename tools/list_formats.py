@@ -142,7 +142,7 @@ def _get_browser_cookies_args():
                 best = os.path.join(profiles_dir, p)
         return best
 
-    # Firefox ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â standard install
+    # Firefox - standard install
     ff_std = os.path.expanduser("~/AppData/Roaming/Mozilla/Firefox/Profiles")
     if _find_ff_profile(ff_std):
         return (["--cookies-from-browser", "firefox"], None)
@@ -187,6 +187,7 @@ def list_formats(url, use_cookies=None):
         # Build base command
         YT_DLP_EXE = _find_yt_dlp()
         COOKIES_FILE = "/tmp/cookies.txt"
+        LOCAL_COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cookies.txt")
         cmd = [
             YT_DLP_EXE,
             "--no-playlist",
@@ -198,11 +199,11 @@ def list_formats(url, use_cookies=None):
         is_instagram = "instagram" in url.lower()
         is_facebook = "facebook.com" in url.lower() or "fb.watch" in url.lower() or "fb.com" in url.lower()
 
-        # ── YouTube: low-fingerprint clients + skip heavy requests ──
+        # ── YouTube: low-fingerprint clients ──
         if is_youtube:
             cmd.extend([
                 "--extractor-args",
-                "youtube:player_client=android_vr,web_safari,web_embedded;player_skip=webpage,configs",
+                "youtube:player_client=android_vr,web_safari,web_embedded",
             ])
             cmd.extend(["--extractor-retries", "5"])
 
@@ -211,18 +212,15 @@ def list_formats(url, use_cookies=None):
             cmd.extend(["--extractor-args", "instagram:app_id=ios"])
             cmd.extend(["--extractor-retries", "5"])
 
-        # ── Cookies: prefer server cookies file, then try local browser ──
+        # ── Cookies: check multiple locations ──
         cookie_warning = None
+        # 1. Render / cloud server: cookies decoded from $COOKIES env var
         if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
-            # Render / cloud server: cookies decoded from $COOKIES env var
             cmd.extend(["--cookies", COOKIES_FILE])
-        elif use_cookies is True or (use_cookies is None and is_instagram):
-            # Local machine: try extracting from browser
-            cookie_args, cookie_warning = _get_browser_cookies_args()
-            if cookie_warning:
-                pass  # Browser found but DB locked
-            elif cookie_args:
-                cmd.extend(cookie_args)
+        # 2. Local project root: user can place cookies.txt for Instagram/YouTube auth
+        elif os.path.isfile(LOCAL_COOKIES_FILE) and os.path.getsize(LOCAL_COOKIES_FILE) > 0:
+            cmd.extend(["--cookies", os.path.abspath(LOCAL_COOKIES_FILE)])
+        # 3. Try browser cookie extraction (falls back gracefully if encrypted)
 
         cmd.append(url)
 
@@ -248,13 +246,25 @@ def list_formats(url, use_cookies=None):
                 return {"error": (
                     "Instagram now requires browser impersonation support, which requires "
                     "a yt-dlp build with curl_cffi. Update with:\n\n"
-                    "ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â° Run:  yt-dlp --update-to master\n\n"
+                    "Run:  yt-dlp --update-to master\n\n"
                     "Then restart the downloader."
                 )}
 
             # Instagram-specific: retry with cookies if we didn't already
             if is_instagram:
                 if "empty media response" in stderr.lower():
+                    # Check for Chrome/Edge encrypted cookie DB errors first
+                    if "could not copy" in stderr.lower() or "failed to decrypt" in stderr.lower():
+                        return {"error": (
+                            "Instagram requires login, but your browser's cookie database is "
+                            "encrypted and yt-dlp cannot read it.\n\n"
+                            "Fix: Export cookies.txt from your browser and place it in the "
+                            "project root folder.\n\n"
+                            "How: Install a 'cookies.txt' export extension, log into Instagram, "
+                            "export cookies, save the file as 'cookies.txt' in the SaveVid "
+                            "project folder, then refresh this page."
+                        )}
+
                     # On Render: cookies file existed but didn't help → expired cookies
                     if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
                         return {"error": (
@@ -271,9 +281,9 @@ def list_formats(url, use_cookies=None):
 
                     if cookie_warning:
                         return {"error": (
-                            "Instagram requires login, but Chrome's cookie database is locked "
-                            "while Chrome is running.\n\n"
-                            f"ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Â° {cookie_warning}\n\n"
+                            "Instagram requires login, but the browser's cookie database is locked "
+                            "while the browser is running.\n\n"
+                            f"{cookie_warning}\n\n"
                             "After trying that, paste the link again.")}
                     return {"error": INSTAGRAM_COOKIE_MSG}
 
@@ -288,7 +298,7 @@ def list_formats(url, use_cookies=None):
                 if "HTTP Error 400" in stderr or "not granting access" in stderr:
                     return {"error": (
                         "Instagram returned an error for this post. This usually means the "
-                        "post is not accessible ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â try logging into Instagram in your browser "
+                        "post is not accessible. Try logging into Instagram in your browser "
                         "and paste the link again with Firefox open."
                     )}
 

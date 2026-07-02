@@ -48,6 +48,8 @@ start.bat
 
 Then open `http://127.0.0.1:5000`.
 
+**Browser cookies for Instagram (local):** The app auto-detects Firefox, Chrome, or Edge cookies via `--cookies-from-browser`. Firefox works while the browser is running. For Chrome/Edge, close the browser first so yt-dlp can read the cookie DB. If no browser cookies are available, Instagram will return an error about needing login.
+
 ### Online (Render.com — YouTube & Instagram work with cookies)
 1. Push code to GitHub: `Rajveer-Adpaikar/savevid`
 2. In Render Dashboard → **New Web Service** → connect repo
@@ -166,11 +168,20 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - Replaced by Render.com which runs a full server, but even Render couldn't solve YouTube/Instagram bot detection
 
 ### yt-dlp — Static Linux Binary with curl_cffi
-- Render's `start.sh` now downloads `yt-dlp_linux` from GitHub releases — this is the **static binary with curl_cffi baked in** (browser impersonation support).
-- pip-installed `yt-dlp` is the "zipimport" binary which deliberately **excludes curl_cffi** — that's why YouTube/Instagram failed before.
-- The binary is downloaded fresh on every deploy (auto-updates to latest).
+- Render's `start.sh` downloads `yt-dlp_linux` from GitHub releases — the **static binary with curl_cffi baked in** (browser impersonation support).
+- pip-installed `yt-dlp` is the "zipimport" binary which deliberately **excludes curl_cffi**.
+- The binary is downloaded fresh on every deploy (auto-updates to latest release).
 - On Windows local dev: `winget install yt-dlp.yt-dlp` includes curl_cffi.
 - Update to latest master: `yt-dlp --update-to master`
+
+### yt-dlp Binary Discovery (`_find_yt_dlp()`)
+Both tools use `_find_yt_dlp()` to locate the binary in this order:
+1. **Project root** (`./yt-dlp.exe` or `./yt-dlp`) — where `start.sh` places it on Render
+2. **Current working directory** — covers cases where cwd differs from project root
+3. **Tools directory** (`tools/yt-dlp`, `tools/yt-dlp_linux`)
+4. **PATH lookup** via `shutil.which("yt-dlp")` — for local installations
+5. **Fallback**: bare `"yt-dlp"` command (works if on PATH)
+- Debug output logged to stderr so Render deploy logs show which path was resolved.
 
 ### DASH Streaming (YouTube + Instagram + Facebook)
 - YouTube, Instagram, and Facebook all use DASH: video and audio are separate adaptation sets.
@@ -187,10 +198,13 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 
 ### Browser Cookies (Instagram)
 - Instagram requires login for most content.
-- `_get_browser_cookies_args()` in both tools auto-detects Firefox profiles first.
+- Cookie detection order:
+  1. `/tmp/cookies.txt` — Render/cloud server (from `$COOKIES` env var)
+  2. `cookies.txt` — local project root (user-placed Netscape-format file)
+  3. Browser cookie extraction via `--cookies-from-browser` (Firefox > Chrome > Edge)
 - **Firefox**: Preferred — cookie DB readable while browser is running.
-- **Chrome/Edge**: DB locked while browser runs. Must close browser first.
-- Falls back gracefully — shows clear error message if cookies unavailable.
+- **Chrome/Edge**: Both use App-Bound Encryption (DPAPI) that **blocks yt-dlp from reading the cookie DB** even when the browser is closed. The error `"Could not copy Chrome cookie database"` or `"Failed to decrypt with DPAPI"` triggers a clear message directing users to export a `cookies.txt` file.
+- **Local cookies.txt fix**: If Chrome/Edge don't work, export cookies via a browser extension, save as `cookies.txt` in the project root, and refresh.
 
 ### Cookie Setup for Render (YouTube + Instagram)
 1. Install a "cookies.txt" export extension in your browser
@@ -241,7 +255,8 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 
 ### `tools/download_video.py`
 - Downloads single format via yt-dlp to `~/Downloads/SaveVid/`.
-- **YouTube + Instagram + Facebook**: auto-appends `+bestaudio/best` for DASH audio merge.
+- **YouTube + Instagram + Facebook**: auto-appends `+bestaudio/best` for DASH audio merge (skipped for audio-only formats).
+- Uses `--windows-filenames`, `--restrict-filenames`, and `--trim-filenames 100` to produce safe, ASCII-only filenames without emojis or special characters.
 - Progress output via stdout for UI feedback.
 - Handles: HTTP 403/404, unavailable formats, impersonation errors, media not found.
 
@@ -253,7 +268,6 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 ├── start.sh                        # Render.com startup script (downloads yt-dlp_linux + decodes cookies)
 ├── requirements.txt                # flask, flask-cors, gunicorn (yt-dlp downloaded as static binary)
 ├── runtime.txt                     # Python 3.12 (Netlify — legacy)
-├── instagram_cookies.txt           # Cookie file for Instagram auth (legacy)
 ├── netlify.toml                    # Netlify deployment config (legacy)
 ├── netlify/functions/api.py        # Netlify Function handler (legacy)
 ├── templates/index.html            # Cinematic landing page (video bg, particles, glass UI)
@@ -262,9 +276,7 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 │   └── download_video.py           # Download a format to ~/Downloads/SaveVid/
 ├── workflows/
 │   └── yt_ig_downloader.md         # SOP for the downloader
-├── .tmp/                           # Temporary debug files (gitignored)
-│   ├── insta_raw.json
-│   └── test_instagram.py
+├── docs/                           # Design specs
 └── .gitignore
 ```
 
@@ -277,16 +289,14 @@ Files save to ~/Downloads/SaveVid/
 
 - **Facebook support (upstream broken)**: The yt-dlp Facebook extractor is currently broken (yt-dlp issue #15161, open since Nov 2025). Facebook changed its page data structure and the extractor can't parse it. The code support is in place (URL validation, DASH reclassification, audio merge), but `yt-dlp -J` fails with "Cannot parse data" for all Facebook URLs. The app shows a graceful error message with update instructions. Track progress at [yt-dlp issue #15161](https://github.com/yt-dlp/yt-dlp/issues/15161).
 - **Instagram 400 errors**: Usually means the post/reel was deleted or your account doesn't have access. Rarely an API break.
-- **"Impersonate target not available"**: yt-dlp needs the curl_cffi build. Copy WinGet binary (see above).
+- **Chrome/Edge cookies blocked on Windows**: Both use App-Bound Encryption (DPAPI). yt-dlp fails with "Could not copy Chrome cookie database" or "Failed to decrypt with DPAPI". Fix: Export `cookies.txt` from a browser extension, place in project root, refresh.
+- **"Impersonate target not available"**: yt-dlp needs the curl_cffi build. Install via winget or download the static binary.
 - **Netlify download limits**: Large files (>10MB) may time out on the free tier. Local mode is better for big downloads.
-- **Cookie DB locked**: Chrome locks its cookie DB when running. Use Firefox or close Chrome first.
-- **Facebook is not public-only**: Unlike YouTube, most Facebook videos require login. Adding `--cookies-from-browser` support may be needed once the extractor is fixed.
 - **Very large files (>2GB)**: No warning currently implemented — downloads proceed directly.
-- **Video background frame extraction**: The Veldara scroll-video frame-extraction approach was replaced with simple `<video autoplay loop>` — far more performant, no lag.
-- **Particle performance**: Particle count is capped at 100 with lower opacity/drift to avoid CPU churn on the canvas.
-- **Footer below fold**: Original CSS used `min-height: 100vh` on `#content` with `flex: 1` on `.hero`, pushing footer off-screen. Fixed by setting `min-height: auto`, `justify-content: center`, reducing hero padding, and removing bottom padding on content container.
-- **Emoji mojibake**: Emoji in JS string literals caused encoding corruption on save. All labels use plain text instead (e.g. `Duration:` not `⏱`).
-- **YouTube works online with cookies**: Uses `yt-dlp_linux` static binary (curl_cffi baked in) + `--cookies /tmp/cookies.txt` from `$COOKIES` env var. Extractor args: `player_client=android_vr,web_safari,web_embedded;player_skip=webpage,configs` — avoids the most heavily monitored requests.
+- **Footer below fold**: Fixed by setting `min-height: auto`, `justify-content: center`, reducing hero padding, and removing bottom padding on content container.
+- **Emoji mojibake**: Emoji in JS string literals and Python error strings caused encoding corruption on save. All labels and error messages use plain ASCII text instead of emoji.
+- **`yt-dlp` binary not found on Render**: Fixed by removing unreliable `os.access(path, os.X_OK)` check and adding `os.getcwd()` + `shutil.which()` fallbacks. Check Render deploy logs for `[find_yt_dlp]` lines to see which path was resolved.
+- **YouTube works online with cookies**: Uses `yt-dlp_linux` static binary (curl_cffi baked in) + `--cookies /tmp/cookies.txt` from `$COOKIES` env var. Extractor args: `player_client=android_vr,web_safari,web_embedded` — uses low-fingerprint clients to avoid bot detection. `player_skip=webpage,configs` was removed (Jul 2026) because YouTube started returning error 152 - 18 when configs were skipped.
 - **Instagram works online with cookies**: Same static binary — uses `instagram:app_id=ios` (only valid extractor arg) + `--cookies` for the `sessionid` cookie. Note: `instagram:webpage=api` **does not exist** in yt-dlp and was silently ignored.
 - **Cookies expire every 2-4 weeks**: YouTube and Instagram cookies are short-lived. When downloads stop working, re-export cookies.txt from your browser, base64-encode it, and update the `COOKIES` env var in Render dashboard. Then trigger a new deploy.
 - **Facebook works without cookies**: Facebook downloads work on Render even without authentication, as long as the video is public and the Facebook extractor isn't broken upstream (issue #15161).

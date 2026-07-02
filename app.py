@@ -119,13 +119,14 @@ def download():
     data = request.get_json()
     url = data.get("url", "").strip()
     format_id = data.get("format_id", "").strip()
+    format_type = data.get("format_type", "").strip()
 
     if not url or not format_id:
         return jsonify({"error": "Missing URL or format selection."}), 400
 
     # Download to a temporary directory unique per request
     tmp_dir = tempfile.mkdtemp(prefix="savevid_")
-    result = download_video(url, format_id, tmp_dir)
+    result = download_video(url, format_id, tmp_dir, format_type=format_type)
 
     if "error" in result:
         # Clean up the temp dir on failure

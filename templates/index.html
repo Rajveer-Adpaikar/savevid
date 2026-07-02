@@ -530,6 +530,7 @@ const API_BASE = '';
 
 let currentData = null;
 let selectedFormatId = null;
+let selectedFormatType = null;
 let currentCategory = null;
 let formatsByCategory = {};
 
@@ -687,11 +688,12 @@ function showCategory(category) {
     return;
   }
 
-  fmts.forEach(f => {
+    fmts.forEach(f => {
     const card = document.createElement('div');
     card.className = 'format-card';
     card.dataset.formatId = f.format_id;
-    card.onclick = () => selectFormat(f.format_id);
+    card.dataset.formatType = f.type;
+    card.onclick = () => selectFormat(f.format_id, f.type);
 
     const radio = document.createElement('input');
     radio.type = 'radio';
@@ -761,8 +763,9 @@ function showCategory(category) {
   }
 }
 
-function selectFormat(formatId) {
+function selectFormat(formatId, formatType) {
   selectedFormatId = formatId;
+  selectedFormatType = formatType;
 
   document.querySelectorAll('.format-card').forEach(c => {
     c.classList.toggle('selected', c.dataset.formatId === formatId);
@@ -792,6 +795,7 @@ async function startDownload() {
       body: JSON.stringify({
         url: currentData.url,
         format_id: selectedFormatId,
+        format_type: selectedFormatType,
       }),
     });
 
@@ -864,6 +868,7 @@ function resetUI() {
   hideError();
   currentData = null;
   selectedFormatId = null;
+  selectedFormatType = null;
   currentCategory = null;
   formatsByCategory = {};
   urlInput.value = '';

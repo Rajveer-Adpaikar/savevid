@@ -112,12 +112,12 @@ def _get_browser_cookies_args():
 
 INSTAGRAM_COOKIE_MSG = (
     'Instagram now requires login to view content. '
-    'Make sure youÃ¢â‚¬â„¢re logged into Instagram in your browser, '
+    "Make sure you're logged into Instagram in your browser, "
     'then try again.'
 )
 
 
-def download_video(url, format_id, output_dir=None, use_cookies=None):
+def download_video(url, format_id, output_dir=None, use_cookies=None, format_type=None):
     """
     Download the specified format from the given URL.
 
@@ -140,6 +140,7 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
         # Build yt-dlp command
         YT_DLP_EXE = _find_yt_dlp()
         COOKIES_FILE = "/tmp/cookies.txt"
+        LOCAL_COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cookies.txt")
         cmd = [
             YT_DLP_EXE,
             "--no-playlist",
@@ -151,11 +152,11 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
         is_instagram = "instagram" in url.lower()
         is_facebook = "facebook.com" in url.lower() or "fb.watch" in url.lower() or "fb.com" in url.lower()
 
-        # ── YouTube: low-fingerprint clients + skip heavy requests ──
+        # ── YouTube: low-fingerprint clients ──
         if is_youtube:
             cmd.extend([
                 "--extractor-args",
-                "youtube:player_client=android_vr,web_safari,web_embedded;player_skip=webpage,configs",
+                "youtube:player_client=android_vr,web_safari,web_embedded",
             ])
             cmd.extend(["--extractor-retries", "5"])
 
@@ -164,26 +165,26 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
             cmd.extend(["--extractor-args", "instagram:app_id=ios"])
             cmd.extend(["--extractor-retries", "5"])
 
-        # ── Cookies: prefer server cookies file, then try local browser ──
+        # ── Cookies: check multiple locations ──
         cookie_warning = None
+        # 1. Render / cloud server: cookies decoded from $COOKIES env var
         if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
-            # Render / cloud server: cookies decoded from $COOKIES env var
             cmd.extend(["--cookies", COOKIES_FILE])
-        elif use_cookies is True or (use_cookies is None and is_instagram):
-            # Local machine: try extracting from browser
-            cookie_args, cookie_warning = _get_browser_cookies_args()
-            if cookie_warning:
-                pass  # Browser found but DB locked
-            elif cookie_args:
-                cmd.extend(cookie_args)
+        # 2. Local project root: user can place cookies.txt for Instagram/YouTube auth
+        elif os.path.isfile(LOCAL_COOKIES_FILE) and os.path.getsize(LOCAL_COOKIES_FILE) > 0:
+            cmd.extend(["--cookies", os.path.abspath(LOCAL_COOKIES_FILE)])
+        # 3. Try browser cookie extraction (falls back gracefully if encrypted)
 
         # For all DASH-based platforms, merge with best available audio since
         # they use separate adaptation sets for video & audio.
         # yt-dlp gracefully falls back to just the video if no audio exists.
-        actual_format = f"{format_id}+bestaudio/best" if (is_instagram or is_youtube or is_facebook) else format_id
+        # Skip merge for audio-only formats — they don't need DASH audio stitching.
+        needs_audio_merge = (is_instagram or is_youtube or is_facebook) and format_type != "audio_only"
+        actual_format = f"{format_id}+bestaudio/best" if needs_audio_merge else format_id
 
         cmd.extend([
             "--windows-filenames",
+            "--restrict-filenames",
             "--trim-filenames", "100",
             "-f", actual_format,
             "-o", os.path.join(output_dir, "%(title).100B.%(ext)s"),
@@ -217,7 +218,7 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
         if process.returncode != 0:
             stderr_text = "\n".join(stderr_lines)
             if "HTTP Error 403" in stderr_text or "HTTP Error 404" in stderr_text:
-                return {"error": "Download failed Ã¢â‚¬â€ the video or format may no longer be available."}
+                return {"error": "Download failed - the video or format may no longer be available."}
             if "Requested format is not available" in stderr_text:
                 return {"error": "The requested format is not available for this video."}
 
@@ -226,13 +227,25 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
                 return {"error": (
                     "Instagram now requires browser impersonation support, which requires "
                     "a yt-dlp build with curl_cffi. Update with:\n\n"
-                    "Ã°Å¸â€˜â€° Run:  yt-dlp --update-to master\n\n"
+                    "Run:  yt-dlp --update-to master\n\n"
                     "Then restart the downloader."
                 )}
 
             # Instagram: retry with cookies if we didn't already
             if is_instagram:
                 if "empty media response" in stderr_text.lower():
+                    # Check for Chrome/Edge encrypted cookie DB errors first
+                    if "could not copy" in stderr_text.lower() or "failed to decrypt" in stderr_text.lower():
+                        return {"error": (
+                            "Instagram requires login, but your browser's cookie database is "
+                            "encrypted and yt-dlp cannot read it.\n\n"
+                            "Fix: Export cookies.txt from your browser and place it in the "
+                            "project root folder.\n\n"
+                            "How: Install a 'cookies.txt' export extension, log into Instagram, "
+                            "export cookies, save the file as 'cookies.txt' in the SaveVid "
+                            "project folder, then refresh this page."
+                        )}
+
                     # On Render: cookies file existed but didn't help → expired
                     if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
                         return {"error": (
@@ -249,13 +262,13 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
 
                     if cookie_warning:
                         return {"error": (
-                            "Instagram requires login, but Chrome's cookie database is locked "
-                            "while Chrome is running.\n\n"
-                            f"Ã°Å¸â€˜â€° {cookie_warning}\n\n"
+                            "Instagram requires login, but the browser's cookie database is "
+                            "locked while the browser is running.\n\n"
+                            f"{cookie_warning}\n\n"
                             "After trying that, paste the link again.")}
                     return {"error": INSTAGRAM_COOKIE_MSG}
 
-                # "Media not found" Ã¢â€ â€™ deleted/private post, not a yt-dlp bug
+                # "Media not found" = deleted/private post, not a yt-dlp bug
                 if "Media not found or unavailable" in stderr_text:
                     return {"error": (
                         "This Instagram post could not be found. It may have been removed, "
@@ -266,7 +279,7 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
                 if "HTTP Error 400" in stderr_text or "not granting access" in stderr_text:
                     return {"error": (
                         "Instagram returned an error for this post. This usually means the "
-                        "post is not accessible Ã¢â‚¬â€ try logging into Instagram in your browser "
+                        "post is not accessible. Try logging into Instagram in your browser "
                         "and paste the link again with Firefox open."
                     )}
 
