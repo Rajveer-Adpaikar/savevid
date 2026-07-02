@@ -153,6 +153,7 @@ def list_formats(url, use_cookies=None):
     """
     try:
         # Build base command
+        COOKIES_FILE = "/tmp/cookies.txt"
         cmd = [
             "yt-dlp",
             "--no-playlist",
@@ -160,24 +161,33 @@ def list_formats(url, use_cookies=None):
             "-J",  # dump JSON
         ]
 
-        # YouTube: use Android client + impersonation to bypass bot detection.
         is_youtube = "youtube" in url.lower() or "youtu.be" in url.lower()
+        is_instagram = "instagram" in url.lower()
+        is_facebook = "facebook.com" in url.lower() or "fb.watch" in url.lower() or "fb.com" in url.lower()
+
+        # ── YouTube: low-fingerprint clients + skip heavy requests ──
         if is_youtube:
-            cmd.extend(["--extractor-args", "youtube:player_client=android_creator,android"])
+            cmd.extend([
+                "--extractor-args",
+                "youtube:player_client=android_vr,web_safari,web_embedded;player_skip=webpage,configs",
+            ])
             cmd.extend(["--extractor-retries", "5"])
 
-        # If user explicitly asked for cookies, or it's Instagram, try with cookies
-        is_instagram = "instagram" in url.lower()
+        # ── Instagram: use iOS App ID (only valid extractor arg) ──
         if is_instagram:
-            cmd.extend(["--extractor-args", "instagram:webpage=api"])
+            cmd.extend(["--extractor-args", "instagram:app_id=ios"])
             cmd.extend(["--extractor-retries", "5"])
-        is_facebook = "facebook.com" in url.lower() or "fb.watch" in url.lower() or "fb.com" in url.lower()
+
+        # ── Cookies: prefer server cookies file, then try local browser ──
         cookie_warning = None
-        if use_cookies is True or (use_cookies is None and is_instagram):
+        if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
+            # Render / cloud server: cookies decoded from $COOKIES env var
+            cmd.extend(["--cookies", COOKIES_FILE])
+        elif use_cookies is True or (use_cookies is None and is_instagram):
+            # Local machine: try extracting from browser
             cookie_args, cookie_warning = _get_browser_cookies_args()
             if cookie_warning:
-                # Browser found but DB locked ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â skip cookies, show message later
-                pass
+                pass  # Browser found but DB locked
             elif cookie_args:
                 cmd.extend(cookie_args)
 
@@ -209,9 +219,18 @@ def list_formats(url, use_cookies=None):
                     "Then restart the downloader."
                 )}
 
-            # Instagram-specific: try with cookies if we didn't already
+            # Instagram-specific: retry with cookies if we didn't already
             if is_instagram:
                 if "empty media response" in stderr.lower():
+                    # On Render: cookies file existed but didn't help → expired cookies
+                    if os.path.isfile(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0:
+                        return {"error": (
+                            "Instagram cookies in the COOKIES env var appear to be expired. "
+                            "Please re-export cookies.txt from your browser and update the "
+                            "COOKIES environment variable in the Render dashboard."
+                        )}
+
+                    # Local mode: retry by extracting browser cookies
                     if use_cookies is None:
                         retry = list_formats(url, use_cookies=True)
                         if "error" not in retry:

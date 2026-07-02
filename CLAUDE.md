@@ -48,23 +48,23 @@ start.bat
 
 Then open `http://127.0.0.1:5000`.
 
-### Online (Render.com — attempted, partial success)
+### Online (Render.com — YouTube & Instagram work with cookies)
 1. Push code to GitHub: `Rajveer-Adpaikar/savevid`
 2. In Render Dashboard → **New Web Service** → connect repo
 3. Settings:
    - **Runtime**: Python 3
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `bash start.sh` (upgrades yt-dlp first)
+   - **Start Command**: `bash start.sh` (downloads yt-dlp_linux binary + decodes cookies)
    - **Plan**: Free
-4. Live URL: `https://savevid-1eve.onrender.com/`
+4. **Required**: Set environment variable `COOKIES` = base64-encoded cookies.txt (see instructions in `start.sh`)
+5. Live URL: `https://savevid-1eve.onrender.com/`
 
-**Current limitations on Render**:
-- ✅ Format listing works for all platforms
+**Current status on Render**:
+- ✅ YouTube — works with fresh browser cookies
+- ✅ Instagram — works with fresh browser cookies (includes `sessionid`)
+- ✅ Facebook — works without cookies (public videos)
 - ✅ File streaming to browser works (downloads trigger via `download_url`)
-- ❌ YouTube — "Sign in to confirm you're not a bot" even with `android_creator` client
-- ❌ Instagram — "requires login" (private content), public content may also fail
-- ✅ Facebook downloads work (the one that actually succeeded in testing)
-- Only reliable option is **local** via `start.bat` on your own machine
+- Cookies expire every 2-4 weeks — re-export and update `COOKIES` env var when downloads stop working
 
 ## Landing Page Design
 
@@ -142,17 +142,17 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 
 ## Deployment
 
-### Primary: Render.com (Full Server — Limited Success)
+### Primary: Render.com (Full Server — Cookies Required)
 - Live URL: `https://savevid-1eve.onrender.com/`
 - Deployed from GitHub repo `Rajveer-Adpaikar/savevid`
 - Runs the full Flask app with Gunicorn — file streaming works (browser downloads)
 - **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `bash start.sh` (upgrades yt-dlp to latest, then starts Gunicorn)
+- **Start Command**: `bash start.sh` (downloads `yt-dlp_linux` static binary with curl_cffi baked in, then decodes `$COOKIES` env var to `/tmp/cookies.txt`)
 - Free tier: 512MB RAM, spins down after 15min idle (~30s cold start)
-- **YouTube**: ❌ Bot detection blocks downloads even with `android_creator` client and latest yt-dlp
-- **Instagram**: ❌ Requires cookies from a real browser (not available on cloud servers)
-- **Facebook**: ✅ Downloads work reliably — both format fetching and downloading
-- **Verdict**: Online deployment works well for Facebook. YouTube/Instagram require local machine with browser cookies.
+- **YouTube**: ✅ Works with fresh browser cookies
+- **Instagram**: ✅ Works with fresh browser cookies (needs `sessionid` cookie)
+- **Facebook**: ✅ Works without cookies (public videos)
+- **Cookies**: Must be exported as Netscape-format `cookies.txt`, base64-encoded, and stored in `COOKIES` env var. Expire every 2-4 weeks.
 
 ### Secondary: Envoyc Portfolio Page
 - A **Portfolio page** exists in the Envoyc site (`src/components/Portfolio.tsx`) showing SaveVid as a project
@@ -165,13 +165,11 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - Serverless Functions have a 10-second timeout and 10MB response limit — all downloads fail
 - Replaced by Render.com which runs a full server, but even Render couldn't solve YouTube/Instagram bot detection
 
-### yt-dlp Requirement
-- Instagram requires yt-dlp **master build with curl_cffi** (browser impersonation).
-- The WinGet version (`winget install yt-dlp.yt-dlp`) includes curl_cffi — **pip install does not**.
-- If you update yt-dlp via pip, copy the WinGet binary over it:
-  ```
-  cp /c/Users/thera/AppData/Local/Microsoft/WinGet/Packages/yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe/yt-dlp.exe /c/Python312/Scripts/yt-dlp.exe
-  ```
+### yt-dlp — Static Linux Binary with curl_cffi
+- Render's `start.sh` now downloads `yt-dlp_linux` from GitHub releases — this is the **static binary with curl_cffi baked in** (browser impersonation support).
+- pip-installed `yt-dlp` is the "zipimport" binary which deliberately **excludes curl_cffi** — that's why YouTube/Instagram failed before.
+- The binary is downloaded fresh on every deploy (auto-updates to latest).
+- On Windows local dev: `winget install yt-dlp.yt-dlp` includes curl_cffi.
 - Update to latest master: `yt-dlp --update-to master`
 
 ### DASH Streaming (YouTube + Instagram + Facebook)
@@ -193,6 +191,15 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - **Firefox**: Preferred — cookie DB readable while browser is running.
 - **Chrome/Edge**: DB locked while browser runs. Must close browser first.
 - Falls back gracefully — shows clear error message if cookies unavailable.
+
+### Cookie Setup for Render (YouTube + Instagram)
+1. Install a "cookies.txt" export extension in your browser
+2. Log into YouTube and Instagram in the same browser session
+3. Export cookies for `youtube.com` and `instagram.com` into a single `cookies.txt`
+4. Base64-encode it: `base64 -w0 cookies.txt` (Linux/Mac) or use an online tool (Windows)
+5. Paste the base64 string as the `COOKIES` environment variable in Render Dashboard
+6. Deploy — `start.sh` decodes it to `/tmp/cookies.txt` automatically
+7. Re-do steps 2-6 every 2-4 weeks when cookies expire
 
 ### Flask Format Cache
 - `app.py` caches format listings per URL for 10 minutes (TTL: 600s).
@@ -243,12 +250,12 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 ```
 ├── app.py                          # Flask web app (main entry)
 ├── start.bat                       # Launcher for Windows
-├── start.sh                        # Render.com startup script (upgrades yt-dlp, starts gunicorn)
-├── requirements.txt                # flask, flask-cors, yt-dlp, gunicorn
-├── runtime.txt                     # Python 3.12 (Netlify)
-├── instagram_cookies.txt           # Cookie file for Instagram auth
-├── netlify.toml                    # Netlify deployment config
-├── netlify/functions/api.py        # Netlify Function handler (reuses tools)
+├── start.sh                        # Render.com startup script (downloads yt-dlp_linux + decodes cookies)
+├── requirements.txt                # flask, flask-cors, gunicorn (yt-dlp downloaded as static binary)
+├── runtime.txt                     # Python 3.12 (Netlify — legacy)
+├── instagram_cookies.txt           # Cookie file for Instagram auth (legacy)
+├── netlify.toml                    # Netlify deployment config (legacy)
+├── netlify/functions/api.py        # Netlify Function handler (legacy)
 ├── templates/index.html            # Cinematic landing page (video bg, particles, glass UI)
 ├── tools/
 │   ├── list_formats.py             # Fetch available formats + sizes
@@ -279,7 +286,8 @@ Files save to ~/Downloads/SaveVid/
 - **Particle performance**: Particle count is capped at 100 with lower opacity/drift to avoid CPU churn on the canvas.
 - **Footer below fold**: Original CSS used `min-height: 100vh` on `#content` with `flex: 1` on `.hero`, pushing footer off-screen. Fixed by setting `min-height: auto`, `justify-content: center`, reducing hero padding, and removing bottom padding on content container.
 - **Emoji mojibake**: Emoji in JS string literals caused encoding corruption on save. All labels use plain text instead (e.g. `Duration:` not `⏱`).
-- **YouTube bot detection unsolved online**: Even with `--extractor-args youtube:player_client=android_creator,android` and latest yt-dlp, Render's pip-installed version can't bypass YouTube's "Sign in to confirm" prompt. The WinGet binary (Windows) has this built-in but Linux pip packages don't include `curl_cffi` for browser impersonation. No known fix without using cookies from a real browser.
-- **Instagram unsolved online**: Instagram requires browser cookies for most content. The API extraction flag (`instagram:webpage=api`) helps with some public reels but not reliably. No known fix for cloud deployment.
-- **Facebook works online**: Facebook downloads surprisingly work on Render. The only platform that fully functions in cloud deployment.
+- **YouTube works online with cookies**: Uses `yt-dlp_linux` static binary (curl_cffi baked in) + `--cookies /tmp/cookies.txt` from `$COOKIES` env var. Extractor args: `player_client=android_vr,web_safari,web_embedded;player_skip=webpage,configs` — avoids the most heavily monitored requests.
+- **Instagram works online with cookies**: Same static binary — uses `instagram:app_id=ios` (only valid extractor arg) + `--cookies` for the `sessionid` cookie. Note: `instagram:webpage=api` **does not exist** in yt-dlp and was silently ignored.
+- **Cookies expire every 2-4 weeks**: YouTube and Instagram cookies are short-lived. When downloads stop working, re-export cookies.txt from your browser, base64-encode it, and update the `COOKIES` env var in Render dashboard. Then trigger a new deploy.
+- **Facebook works without cookies**: Facebook downloads work on Render even without authentication, as long as the video is public and the Facebook extractor isn't broken upstream (issue #15161).
 - **File streaming via download tokens**: `app.py` generates one-time `/api/dl/<token>` URLs that stream the file to the browser and clean up the temp directory afterward. Works for all successfully downloaded files.
