@@ -88,6 +88,24 @@ def get_format_type(fmt):
     return "unknown"
 
 
+def _find_yt_dlp():
+    """Locate the yt-dlp binary. Checks project root, then PATH."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Check parent directory (project root — where start.sh puts the binary)
+    parent = os.path.dirname(script_dir)
+    for candidate in (parent, script_dir):
+        path = os.path.join(candidate, "yt-dlp")
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    # Also check the tools directory under a few known names
+    for name in ("yt-dlp", "yt-dlp_linux"):
+        path = os.path.join(script_dir, name)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    # Fallback: let the OS resolve via PATH
+    return "yt-dlp"
+
+
 def _get_browser_cookies_args():
     """Returns (args_list, warning_or_None).
 
@@ -153,9 +171,10 @@ def list_formats(url, use_cookies=None):
     """
     try:
         # Build base command
+        YT_DLP_EXE = _find_yt_dlp()
         COOKIES_FILE = "/tmp/cookies.txt"
         cmd = [
-            "yt-dlp",
+            YT_DLP_EXE,
             "--no-playlist",
             "--no-warnings",
             "-J",  # dump JSON

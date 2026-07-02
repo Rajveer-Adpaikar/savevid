@@ -27,6 +27,21 @@ def get_downloads_folder():
 DEFAULT_OUTPUT_DIR = os.path.join(get_downloads_folder(), "SaveVid")
 
 
+def _find_yt_dlp():
+    """Locate the yt-dlp binary. Checks project root, then PATH."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent = os.path.dirname(script_dir)
+    for candidate in (parent, script_dir):
+        path = os.path.join(candidate, "yt-dlp")
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    for name in ("yt-dlp", "yt-dlp_linux"):
+        path = os.path.join(script_dir, name)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return "yt-dlp"
+
+
 def _get_browser_cookies_args():
     """Returns (args_list, warning_or_None).
 
@@ -106,9 +121,10 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
 
     try:
         # Build yt-dlp command
+        YT_DLP_EXE = _find_yt_dlp()
         COOKIES_FILE = "/tmp/cookies.txt"
         cmd = [
-            "yt-dlp",
+            YT_DLP_EXE,
             "--no-playlist",
             "--no-warnings",
             "--newline",  # Progress on new lines for easier parsing

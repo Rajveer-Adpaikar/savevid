@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SaveVid — Render.com startup script
-# Downloads the yt-dlp Linux static binary (includes curl_cffi for browser
+# Downloads the yt-dlp static binary (includes curl_cffi for browser
 # impersonation), decodes cookies from env var, then starts Gunicorn.
 #
 # To add cookies:
@@ -16,16 +16,28 @@ set -e
 echo "== SaveVid =="
 
 # ── 1. Download yt-dlp static binary (has curl_cffi baked in) ──
-# The binary is named "yt-dlp" so subprocess can find it via PATH.
 if [ ! -f "./yt-dlp" ]; then
     echo "Downloading yt-dlp (static Linux binary with curl_cffi)..."
-    wget -q --show-progress \
-        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
-        -O yt-dlp
+    if command -v curl &> /dev/null; then
+        curl -L -o yt-dlp \
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+    elif command -v wget &> /dev/null; then
+        wget -q --show-progress \
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
+            -O yt-dlp
+    else
+        echo "ERROR: Neither curl nor wget available — cannot download yt-dlp."
+        exit 1
+    fi
     chmod +x yt-dlp
+    echo "yt-dlp downloaded and made executable."
+else
+    echo "yt-dlp binary already exists, skipping download."
 fi
-# Ensure the current directory is on PATH so bare "yt-dlp" calls work
-export PATH="$(pwd):$PATH"
+
+# Show binary info for debugging
+ls -la yt-dlp
+file yt-dlp 2>/dev/null || true
 
 # ── 2. Decode cookies from env var ──
 if [ -n "$COOKIES" ]; then
