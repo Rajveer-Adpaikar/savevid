@@ -60,6 +60,41 @@ def _find_yt_dlp():
     return "yt-dlp"
 
 
+def _ensure_yt_dlp():
+    """Idempotent: return path to yt-dlp, auto-downloading once if missing."""
+    exe = _find_yt_dlp()
+    if exe != "yt-dlp":
+        return exe
+    # Last resort: try to download yt-dlp (covers Render when start.sh wasn't run)
+    import platform, urllib.request, stat
+    system = platform.system().lower()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent = os.path.dirname(script_dir)
+    if system == "linux":
+        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+        dest = os.path.join(parent, "yt-dlp")
+    elif system == "windows":
+        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+        dest = os.path.join(parent, "yt-dlp.exe")
+    elif system == "darwin":
+        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
+        dest = os.path.join(parent, "yt-dlp")
+    else:
+        return exe
+    try:
+        print(f"[find_yt_dlp] Downloading yt-dlp from {url}...", file=sys.stderr)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            with open(dest, "wb") as f:
+                f.write(r.read())
+        os.chmod(dest, os.stat(dest).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        print(f"[find_yt_dlp] Downloaded to {dest}", file=sys.stderr)
+        return dest
+    except Exception as e:
+        print(f"[find_yt_dlp] Download failed: {e}", file=sys.stderr)
+        return exe
+
+
 def _get_browser_cookies_args():
     """Returns (args_list, warning_or_None).
 
@@ -139,7 +174,7 @@ def download_video(url, format_id, output_dir=None, use_cookies=None, format_typ
 
     try:
         # Build yt-dlp command
-        YT_DLP_EXE = _find_yt_dlp()
+        YT_DLP_EXE = _ensure_yt_dlp()
         COOKIES_FILE = "/tmp/cookies.txt"
         LOCAL_COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cookies.txt")
         cmd = [

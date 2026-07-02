@@ -149,7 +149,8 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - Deployed from GitHub repo `Rajveer-Adpaikar/savevid`
 - Runs the full Flask app with Gunicorn — file streaming works (browser downloads)
 - **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `bash start.sh` (downloads `yt-dlp_linux` static binary with curl_cffi baked in, then decodes `$COOKIES` env var to `/tmp/cookies.txt`)
+- **Start Command**: must be `bash start.sh` (NOT `gunicorn app:app`). start.sh downloads the yt-dlp binary and decodes cookies.
+- **Self-healing fallback**: If start.sh wasn't run, `_ensure_yt_dlp()` auto-downloads yt-dlp from GitHub releases on first API call and caches it at the project root.
 - Free tier: 512MB RAM, spins down after 15min idle (~30s cold start)
 - **YouTube**: ✅ Works with fresh browser cookies
 - **Instagram**: ✅ Works with fresh browser cookies (needs `sessionid` cookie)
@@ -180,13 +181,13 @@ Both tools use `_find_yt_dlp()` to locate the binary in this order:
 2. **Current working directory** — covers cases where cwd differs from project root
 3. **Tools directory** (`tools/yt-dlp`, `tools/yt-dlp_linux`)
 4. **PATH lookup** via `shutil.which("yt-dlp")` — for local installations
-5. **Fallback**: bare `"yt-dlp"` command (works if on PATH)
+5. **Fallback**: `_ensure_yt_dlp()` auto-downloads the correct binary from GitHub releases for the current platform (Linux/macOS/Windows). Cached at project root for subsequent calls.
 - Debug output logged to stderr so Render deploy logs show which path was resolved.
 
 ### DASH Streaming (YouTube + Instagram + Facebook)
 - YouTube, Instagram, and Facebook all use DASH: video and audio are separate adaptation sets.
 - High-resolution video formats (4K, 1080p, etc.) have `acodec: "none"` (video_only in yt-dlp).
-- **Download fix**: `format_id + bestaudio/best` auto-merges audio via yt-dlp for both platforms.
+- **Download fix**: `format_id + bestaudio/best` auto-merges audio via yt-dlp (skipped for audio-only formats, which don't need DASH stitching).
 - **Display fix**: `video_only` formats are reclassified as "combined" for YouTube, Instagram, and Facebook so higher resolutions appear under "Video (MP4)" instead of being hidden in a separate category.
 - Instagram reels sometimes genuinely have no audio — downloads fall back to video-only.
 
@@ -258,6 +259,7 @@ Both tools use `_find_yt_dlp()` to locate the binary in this order:
 - **YouTube + Instagram + Facebook**: auto-appends `+bestaudio/best` for DASH audio merge (skipped for audio-only formats).
 - Uses `--windows-filenames`, `--restrict-filenames`, and `--trim-filenames 100` to produce safe, ASCII-only filenames without emojis or special characters.
 - Accepts optional `progress_callback` — called with `{"percent": 45.2, "speed": "...", "eta": "..."}` on each yt-dlp progress line.
+- Accepts optional `format_type` param — when `"audio_only"`, the `+bestaudio/best` merge is skipped.
 - Handles: HTTP 403/404, unavailable formats, impersonation errors, media not found.
 
 ## Project Structure
@@ -293,9 +295,11 @@ Files save to ~/Downloads/SaveVid/
 - **"Impersonate target not available"**: yt-dlp needs the curl_cffi build. Install via winget or download the static binary.
 - **Netlify download limits**: Large files (>10MB) may time out on the free tier. Local mode is better for big downloads.
 - **Very large files (>2GB)**: No warning currently implemented — downloads proceed directly.
+- **Missing `import re` in download_video.py**: Progress callback parsing uses `re.search()` but `re` wasn't imported. Fixed by adding `import re` to the imports block.
 - **Footer below fold**: Fixed by setting `min-height: auto`, `justify-content: center`, reducing hero padding, and removing bottom padding on content container.
 - **Emoji mojibake**: Emoji in JS string literals and Python error strings caused encoding corruption on save. All labels and error messages use plain ASCII text instead of emoji.
 - **`yt-dlp` binary not found on Render**: Fixed by removing unreliable `os.access(path, os.X_OK)` check and adding `os.getcwd()` + `shutil.which()` fallbacks. Check Render deploy logs for `[find_yt_dlp]` lines to see which path was resolved.
+- **auto-download fallback**: If yt-dlp isn't found anywhere, `_ensure_yt_dlp()` downloads the correct binary from GitHub releases on first call and caches it at the project root. This handles cases where the Render start command is set to `gunicorn app:app` instead of `bash start.sh`.
 - **YouTube works online with cookies**: Uses `yt-dlp_linux` static binary (curl_cffi baked in) + `--cookies /tmp/cookies.txt` from `$COOKIES` env var. Extractor args: `player_client=android_vr,web_safari,web_embedded` — uses low-fingerprint clients to avoid bot detection. `player_skip=webpage,configs` was removed (Jul 2026) because YouTube started returning error 152 - 18 when configs were skipped.
 - **Instagram works online with cookies**: Same static binary — uses `instagram:app_id=ios` (only valid extractor arg) + `--cookies` for the `sessionid` cookie. Note: `instagram:webpage=api` **does not exist** in yt-dlp and was silently ignored.
 - **Cookies expire every 2-4 weeks**: YouTube and Instagram cookies are short-lived. When downloads stop working, re-export cookies.txt from your browser, base64-encode it, and update the `COOKIES` env var in Render dashboard. Then trigger a new deploy.

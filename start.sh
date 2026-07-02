@@ -13,7 +13,13 @@
 
 set -e
 
-echo "== SaveVid =="
+echo "================================================="
+echo "=  SaveVid — Render Startup Script              ="
+echo "================================================="
+echo "Current directory: $(pwd)"
+echo "Directory listing:"
+ls -la
+echo ""
 
 # ── 1. Download yt-dlp static binary (has curl_cffi baked in) ──
 if [ ! -f "./yt-dlp" ]; then
