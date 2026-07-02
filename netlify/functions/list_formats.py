@@ -160,10 +160,10 @@ def list_formats(url, use_cookies=None):
             "-J",  # dump JSON
         ]
 
-        # YouTube: use Android + web player clients to reduce bot detection
+        # YouTube: use Android client + impersonation to bypass bot detection.
         is_youtube = "youtube" in url.lower() or "youtu.be" in url.lower()
         if is_youtube:
-            cmd.extend(["--extractor-args", "youtube:player_client=android,web"])
+            cmd.extend(["--extractor-args", "youtube:player_client=android_creator,android"])
             cmd.extend(["--extractor-retries", "5"])
 
         # If user explicitly asked for cookies, or it's Instagram, try with cookies

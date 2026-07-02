@@ -113,17 +113,19 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
             "--newline",  # Progress on new lines for easier parsing
         ]
 
-        # YouTube: use Android + web player clients to reduce bot detection.
-        # The web client triggers CAPTCHAs less often, and Android as fallback.
+        # YouTube: use Android client + impersonation to bypass bot detection.
+        # The pip-installed yt-dlp on Render usually lacks curl_cffi, so the
+        # default web client triggers CAPTCHAs.  Android client + impersonation
+        # works without curl_cffi on most videos.
         is_youtube = "youtube" in url.lower() or "youtu.be" in url.lower()
         if is_youtube:
-            cmd.extend(["--extractor-args", "youtube:player_client=android,web"])
+            cmd.extend(["--extractor-args", "youtube:player_client=android_creator,android"])
             cmd.extend(["--extractor-retries", "5"])
 
         # Add cookies for Instagram URLs (auto-detected)
         is_instagram = "instagram" in url.lower()
         if is_instagram:
-            # Try API-based extraction (less bot-detection than web)
+            # API-based extraction with impersonation handles public content
             cmd.extend(["--extractor-args", "instagram:webpage=api"])
             cmd.extend(["--extractor-retries", "5"])
         is_facebook = "facebook.com" in url.lower() or "fb.watch" in url.lower() or "fb.com" in url.lower()

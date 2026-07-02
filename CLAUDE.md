@@ -123,11 +123,12 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - Deployed from GitHub repo `Rajveer-Adpaikar/savevid`
 - Runs the full Flask app with Gunicorn — no serverless limitations
 - **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `gunicorn app:app`
+- **Start Command**: `bash start.sh` (upgrades yt-dlp to latest master, then starts Gunicorn)
+- **Important**: After each push, ensure yt-dlp stays up-to-date. The `start.sh` script handles this.
 - Free tier: 512MB RAM, spins down after 15min idle (~30s cold start)
-- yt-dlp installs natively, no compilation issues
-- Instagram downloads still won't work (no browser cookies in cloud)
-- Small YouTube clips (<10MB) download fine
+- YouTube downloads work with `android_creator` player client (bypasses CAPTCHAs)
+- Instagram: Only public reels/posts work via API extraction. Private content needs cookies.
+- Small YouTube clips download fine
 
 ### Secondary: Envoyc Portfolio Page
 - A **Portfolio page** exists in the Envoyc site (`src/components/Portfolio.tsx`) showing SaveVid as a project
