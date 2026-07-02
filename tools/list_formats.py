@@ -89,20 +89,34 @@ def get_format_type(fmt):
 
 
 def _find_yt_dlp():
-    """Locate the yt-dlp binary. Checks project root, tools dir, then PATH."""
+    """Locate the yt-dlp binary. Checks project root, cwd, tools dir, then PATH."""
+    import shutil
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(script_dir)
     candidates = [
         os.path.join(parent, "yt-dlp.exe"),       # Windows (project root)
         os.path.join(parent, "yt-dlp"),            # Linux/macOS (project root)
+        os.path.join(os.getcwd(), "yt-dlp"),       # current working directory
+        os.path.join(os.getcwd(), "yt-dlp.exe"),   # cwd with .exe
         os.path.join(script_dir, "yt-dlp.exe"),    # Windows (tools dir)
         os.path.join(script_dir, "yt-dlp"),        # Linux/macOS (tools dir)
         os.path.join(script_dir, "yt-dlp_linux"),  # old naming
     ]
     for path in candidates:
         if os.path.isfile(path):
-            return path
-    # Fallback: let the OS resolve via PATH
+            resolved = os.path.abspath(path)
+            print("[find_yt_dlp] Found:", resolved, file=sys.stderr)
+            return resolved
+    # Fallback: proper PATH search via shutil
+    which = shutil.which("yt-dlp")
+    if which:
+        print("[find_yt_dlp] Found via PATH:", which, file=sys.stderr)
+        return which
+    which = shutil.which("yt-dlp_linux")
+    if which:
+        print("[find_yt_dlp] Found via PATH:", which, file=sys.stderr)
+        return which
+    print("[find_yt_dlp] Fallback to bare 'yt-dlp'", file=sys.stderr)
     return "yt-dlp"
 
 

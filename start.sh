@@ -19,18 +19,24 @@ echo "== SaveVid =="
 if [ ! -f "./yt-dlp" ]; then
     echo "Downloading yt-dlp (static Linux binary with curl_cffi)..."
     if command -v curl &> /dev/null; then
-        curl -L -o yt-dlp \
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+        curl -fL -o yt-dlp \
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
+            || { echo "ERROR: curl download failed."; exit 1; }
     elif command -v wget &> /dev/null; then
         wget -q --show-progress \
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
-            -O yt-dlp
+            -O yt-dlp || { echo "ERROR: wget download failed."; exit 1; }
     else
         echo "ERROR: Neither curl nor wget available — cannot download yt-dlp."
         exit 1
     fi
     chmod +x yt-dlp
-    echo "yt-dlp downloaded and made executable."
+    # Verify download succeeded
+    if [ ! -s yt-dlp ]; then
+        echo "ERROR: Downloaded yt-dlp is empty — download failed."
+        exit 1
+    fi
+    echo "yt-dlp downloaded and made executable ($(stat -c%s yt-dlp 2>/dev/null || wc -c < yt-dlp) bytes)."
 else
     echo "yt-dlp binary already exists, skipping download."
 fi
