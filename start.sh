@@ -15,14 +15,17 @@ set -e
 
 echo "== SaveVid =="
 
-# ── 1. Download yt-dlp_linux static binary (has curl_cffi baked in) ──
-YTDLP="./yt-dlp_linux"
-if [ ! -f "$YTDLP" ]; then
-    echo "Downloading yt-dlp_linux (static binary with curl_cffi)..."
+# ── 1. Download yt-dlp static binary (has curl_cffi baked in) ──
+# The binary is named "yt-dlp" so subprocess can find it via PATH.
+if [ ! -f "./yt-dlp" ]; then
+    echo "Downloading yt-dlp (static Linux binary with curl_cffi)..."
     wget -q --show-progress \
-        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
-    chmod +x yt-dlp_linux
+        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" \
+        -O yt-dlp
+    chmod +x yt-dlp
 fi
+# Ensure the current directory is on PATH so bare "yt-dlp" calls work
+export PATH="$(pwd):$PATH"
 
 # ── 2. Decode cookies from env var ──
 if [ -n "$COOKIES" ]; then
