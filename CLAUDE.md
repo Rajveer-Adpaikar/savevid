@@ -18,6 +18,7 @@ The UI is a cinematic landing page with autoplay video background, particle anim
 
 ## Quick Start
 
+### Local (full downloads, no limits)
 ```bash
 # Start the proxy (required for free models via OpenCode Zen)
 python %USERPROFILE%\.claude\zen_proxy.py
@@ -28,6 +29,19 @@ start.bat
 ```
 
 Then open `http://127.0.0.1:5000`.
+
+### Online (Render.com — free tier, demo/showcase)
+1. Push code to GitHub: `Rajveer-Adpaikar/savevid`
+2. In Render Dashboard → **New Web Service** → connect repo
+3. Settings:
+   - **Runtime**: Python 3
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app:app`
+   - **Plan**: Free
+4. Deploy — takes ~2 minutes
+5. URL: `https://savevid.onrender.com` (customizable)
+
+**Limitations**: ~30s cold start after 15min idle. Downloads >10MB may still struggle on free tier.
 
 ## Landing Page Design
 
@@ -103,22 +117,28 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - Action-verb format implies utility (like "Dropbox," "ScanSnap")
 - Included in all title tags, meta descriptions, and structured data for keyword density
 
-## Deployment (Envoyc Portfolio)
+## Deployment
+
+### Primary: Render.com (Full Server — Recommended Online Hosting)
+- Deployed from GitHub repo `Rajveer-Adpaikar/savevid`
+- Runs the full Flask app with Gunicorn — no serverless limitations
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `gunicorn app:app`
+- Free tier: 512MB RAM, spins down after 15min idle (~30s cold start)
+- yt-dlp installs natively, no compilation issues
+- Instagram downloads still won't work (no browser cookies in cloud)
+- Small YouTube clips (<10MB) download fine
+
+### Secondary: Envoyc Portfolio Page
 - A **Portfolio page** exists in the Envoyc site (`src/components/Portfolio.tsx`) showing SaveVid as a project
 - Navigation link to Portfolio sits between Services and How It Works in the navbar
-- **Preferred deployment**: subdirectory of envoyc.com → `https://envoyc.com/savevid`
+- Preferred deployment: subdirectory of envoyc.com → `https://envoyc.com/savevid`
   - Subdirectory inherits domain authority from envoyc.com (vs standalone subdomain at zero SEO trust)
-- Netlify subdomain fallback available but not preferred
-- Live URL: https://savevidfree.netlify.app/
 
-### Netlify Function Limitations
-- **Format listing works**: `/api/formats` runs `yt-dlp -J` (fast JSON response, well within 10s timeout)
-- **Downloads are limited**: Netlify Functions have a 10-second timeout and 10MB response limit on the free tier
-  - Small YouTube clips (<5MB) may download successfully
-  - Larger files or 4K videos will time out or exceed the response limit
-  - Instagram requires browser cookies (not available in Lambda)
-- **To download large files**: Use the local Flask app instead (`python app.py` or start.bat)
-- Netlify deployment is ideal for **demo/showcase purposes** and listing formats
+### Legacy: Netlify (Replaced — Not Recommended)
+- Brief deployment at `https://savevidfree.netlify.app/`
+- Serverless Functions have a 10-second timeout and 10MB response limit — downloads reliably fail
+- Replaced by Render.com which runs a full server with no hard timeouts
 
 ### yt-dlp Requirement
 - Instagram requires yt-dlp **master build with curl_cffi** (browser impersonation).
@@ -198,7 +218,7 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 ```
 ├── app.py                          # Flask web app (main entry)
 ├── start.bat                       # Launcher for Windows
-├── requirements.txt                # flask, flask-cors, yt-dlp
+├── requirements.txt                # flask, flask-cors, yt-dlp, gunicorn
 ├── runtime.txt                     # Python 3.12 (Netlify)
 ├── instagram_cookies.txt           # Cookie file for Instagram auth
 ├── netlify.toml                    # Netlify deployment config
