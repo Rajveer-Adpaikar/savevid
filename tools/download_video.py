@@ -28,17 +28,20 @@ DEFAULT_OUTPUT_DIR = os.path.join(get_downloads_folder(), "SaveVid")
 
 
 def _find_yt_dlp():
-    """Locate the yt-dlp binary. Checks project root, then PATH."""
+    """Locate the yt-dlp binary. Checks project root, tools dir, then PATH."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(script_dir)
-    for candidate in (parent, script_dir):
-        path = os.path.join(candidate, "yt-dlp")
-        if os.path.isfile(path) and os.access(path, os.X_OK):
+    candidates = [
+        os.path.join(parent, "yt-dlp.exe"),       # Windows (project root)
+        os.path.join(parent, "yt-dlp"),            # Linux/macOS (project root)
+        os.path.join(script_dir, "yt-dlp.exe"),    # Windows (tools dir)
+        os.path.join(script_dir, "yt-dlp"),        # Linux/macOS (tools dir)
+        os.path.join(script_dir, "yt-dlp_linux"),  # old naming
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
             return path
-    for name in ("yt-dlp", "yt-dlp_linux"):
-        path = os.path.join(script_dir, name)
-        if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
+    # Fallback: let the OS resolve via PATH
     return "yt-dlp"
 
 
