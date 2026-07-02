@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A local Flask web app that downloads videos from **YouTube**, **Instagram**, and **Facebook** via yt-dlp. Runs on `http://127.0.0.1:5000`. Also deployable to Netlify (with limitations).
+A local Flask web app that downloads videos from **YouTube**, **Instagram**, and **Facebook** via yt-dlp. Runs on `http://127.0.0.1:5000`. Also attempted on Netlify and Render.com — **online deployment works for format listing and file streaming, but YouTube/Instagram bot detection remains a challenge on cloud servers**.
 
 The UI is a cinematic landing page with autoplay video background, particle animation, and glass-morphism cards — designed to showcase both the downloader and the developer's brand (Envoyc).
 
@@ -15,6 +15,24 @@ The UI is a cinematic landing page with autoplay video background, particle anim
 | **Workflow** | Instructions/SOP | `workflows/yt_ig_downloader.md` |
 | **Agent** | You — orchestrates tools | This CLAUDE.md |
 | **Tools** | Deterministic Python scripts | `tools/list_formats.py`, `tools/download_video.py` |
+
+## Subagents
+
+Alongside tools (deterministic scripts), you have access to subagents (specialized Claude instances with their own context window) for tasks that would otherwise flood your main context with noise. Defined in `.claude/agents/`:
+
+- **`docs-fetcher`** — looks up current official documentation for an API, library, or tool before you integrate it. Use before writing integration code for anything unfamiliar, rather than relying on memory (which may be outdated or wrong).
+- **`debugger`** — investigates a failure and reports the root cause in plain language before any fix is attempted. Use whenever a tool errors out, a workflow produces wrong output, or something breaks in a way that isn't immediately obvious.
+- **`qa-tester`** — verifies a tool or workflow actually works after it's built or changed, running existing tests or manually exercising the logic. Use after implementing or fixing something, before marking a workflow step done.
+- **`code-reviewer`** — read-only check for exposed secrets, unsafe input handling, and other risks in a tool before it touches real credentials, real data, or a scheduled run. Use before any tool goes from "just written" to "trusted to run unattended."
+
+**How to sequence them:**
+
+- **One at a time, not parallel, when one agent's output feeds the next.** `debugger` → fix → `qa-tester` is a chain: you need the debugger's diagnosis before attempting a fix, and you need the fix in place before testing it. Running these together wastes effort since qa-tester would just be re-confirming the same failure the debugger is diagnosing.
+- **`docs-fetcher` runs solo, upfront**, before you write or modify a tool — it's a research step, not a review step, so there's nothing to parallelize it against yet.
+- **`qa-tester` and `code-reviewer` CAN run in parallel** once a tool is written and stable enough to check. Neither modifies anything, neither depends on the other's output, and they're looking at different concerns (does it work vs. is it safe). This is the one case where firing both at once genuinely saves time instead of adding coordination overhead.
+- **Default rule of thumb:** if a subagent needs to read the result of a previous subagent to do its job, run them in sequence. If two subagents are independently inspecting the same finished piece of work, run them in parallel.
+
+A typical flow for building or fixing a tool: `docs-fetcher` (if new integration) → build/fix the tool → `qa-tester` + `code-reviewer` in parallel → if either finds a problem, `debugger` investigates → fix → re-run `qa-tester`.
 
 ## Quick Start
 
@@ -30,18 +48,23 @@ start.bat
 
 Then open `http://127.0.0.1:5000`.
 
-### Online (Render.com — free tier, demo/showcase)
+### Online (Render.com — attempted, partial success)
 1. Push code to GitHub: `Rajveer-Adpaikar/savevid`
 2. In Render Dashboard → **New Web Service** → connect repo
 3. Settings:
    - **Runtime**: Python 3
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app`
+   - **Start Command**: `bash start.sh` (upgrades yt-dlp first)
    - **Plan**: Free
-4. Deploy — takes ~2 minutes
-5. URL: `https://savevid.onrender.com` (customizable)
+4. Live URL: `https://savevid-1eve.onrender.com/`
 
-**Limitations**: ~30s cold start after 15min idle. Downloads >10MB may still struggle on free tier.
+**Current limitations on Render**:
+- ✅ Format listing works for all platforms
+- ✅ File streaming to browser works (downloads trigger via `download_url`)
+- ❌ YouTube — "Sign in to confirm you're not a bot" even with `android_creator` client
+- ❌ Instagram — "requires login" (private content), public content may also fail
+- ✅ Facebook downloads work (the one that actually succeeded in testing)
+- Only reliable option is **local** via `start.bat` on your own machine
 
 ## Landing Page Design
 
@@ -119,16 +142,17 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 
 ## Deployment
 
-### Primary: Render.com (Full Server — Recommended Online Hosting)
+### Primary: Render.com (Full Server — Limited Success)
+- Live URL: `https://savevid-1eve.onrender.com/`
 - Deployed from GitHub repo `Rajveer-Adpaikar/savevid`
-- Runs the full Flask app with Gunicorn — no serverless limitations
+- Runs the full Flask app with Gunicorn — file streaming works (browser downloads)
 - **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `bash start.sh` (upgrades yt-dlp to latest master, then starts Gunicorn)
-- **Important**: After each push, ensure yt-dlp stays up-to-date. The `start.sh` script handles this.
+- **Start Command**: `bash start.sh` (upgrades yt-dlp to latest, then starts Gunicorn)
 - Free tier: 512MB RAM, spins down after 15min idle (~30s cold start)
-- YouTube downloads work with `android_creator` player client (bypasses CAPTCHAs)
-- Instagram: Only public reels/posts work via API extraction. Private content needs cookies.
-- Small YouTube clips download fine
+- **YouTube**: ❌ Bot detection blocks downloads even with `android_creator` client and latest yt-dlp
+- **Instagram**: ❌ Requires cookies from a real browser (not available on cloud servers)
+- **Facebook**: ✅ Downloads work reliably — both format fetching and downloading
+- **Verdict**: Online deployment works well for Facebook. YouTube/Instagram require local machine with browser cookies.
 
 ### Secondary: Envoyc Portfolio Page
 - A **Portfolio page** exists in the Envoyc site (`src/components/Portfolio.tsx`) showing SaveVid as a project
@@ -136,10 +160,10 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 - Preferred deployment: subdirectory of envoyc.com → `https://envoyc.com/savevid`
   - Subdirectory inherits domain authority from envoyc.com (vs standalone subdomain at zero SEO trust)
 
-### Legacy: Netlify (Replaced — Not Recommended)
-- Brief deployment at `https://savevidfree.netlify.app/`
-- Serverless Functions have a 10-second timeout and 10MB response limit — downloads reliably fail
-- Replaced by Render.com which runs a full server with no hard timeouts
+### Legacy: Netlify (Replaced — Serverless Limits)
+- Deployment at `https://savevidfree.netlify.app/`
+- Serverless Functions have a 10-second timeout and 10MB response limit — all downloads fail
+- Replaced by Render.com which runs a full server, but even Render couldn't solve YouTube/Instagram bot detection
 
 ### yt-dlp Requirement
 - Instagram requires yt-dlp **master build with curl_cffi** (browser impersonation).
@@ -219,6 +243,7 @@ The app was renamed from "YT + IG Downloader" to **SaveVid** after an SEO brand-
 ```
 ├── app.py                          # Flask web app (main entry)
 ├── start.bat                       # Launcher for Windows
+├── start.sh                        # Render.com startup script (upgrades yt-dlp, starts gunicorn)
 ├── requirements.txt                # flask, flask-cors, yt-dlp, gunicorn
 ├── runtime.txt                     # Python 3.12 (Netlify)
 ├── instagram_cookies.txt           # Cookie file for Instagram auth
@@ -254,3 +279,7 @@ Files save to ~/Downloads/SaveVid/
 - **Particle performance**: Particle count is capped at 100 with lower opacity/drift to avoid CPU churn on the canvas.
 - **Footer below fold**: Original CSS used `min-height: 100vh` on `#content` with `flex: 1` on `.hero`, pushing footer off-screen. Fixed by setting `min-height: auto`, `justify-content: center`, reducing hero padding, and removing bottom padding on content container.
 - **Emoji mojibake**: Emoji in JS string literals caused encoding corruption on save. All labels use plain text instead (e.g. `Duration:` not `⏱`).
+- **YouTube bot detection unsolved online**: Even with `--extractor-args youtube:player_client=android_creator,android` and latest yt-dlp, Render's pip-installed version can't bypass YouTube's "Sign in to confirm" prompt. The WinGet binary (Windows) has this built-in but Linux pip packages don't include `curl_cffi` for browser impersonation. No known fix without using cookies from a real browser.
+- **Instagram unsolved online**: Instagram requires browser cookies for most content. The API extraction flag (`instagram:webpage=api`) helps with some public reels but not reliably. No known fix for cloud deployment.
+- **Facebook works online**: Facebook downloads surprisingly work on Render. The only platform that fully functions in cloud deployment.
+- **File streaming via download tokens**: `app.py` generates one-time `/api/dl/<token>` URLs that stream the file to the browser and clean up the temp directory afterward. Works for all successfully downloaded files.

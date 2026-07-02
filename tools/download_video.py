@@ -145,9 +145,9 @@ def download_video(url, format_id, output_dir=None, use_cookies=None):
 
         cmd.extend([
             "--windows-filenames",
-            "--trim-filenames", "80",
+            "--trim-filenames", "100",
             "-f", actual_format,
-            "-o", os.path.join(output_dir, "%(title)s.%(ext)s"),
+            "-o", os.path.join(output_dir, "%(title).100B.%(ext)s"),
             url,
         ])
 
