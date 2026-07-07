@@ -66,6 +66,13 @@ else
     echo "See start.sh comments for how to add cookies."
 fi
 
+# ── 3. Start keep-alive background process ──
+# Pings the app every 12 minutes so Render's free tier doesn't spin down.
+# RENDER_EXTERNAL_URL is auto-set by Render; falls back to hardcoded URL.
+echo "Starting keepalive background process..."
+python keepalive.py &
+echo "Keepalive PID: $!"
+
 echo ""
 echo "Starting Gunicorn..."
 exec gunicorn app:app
